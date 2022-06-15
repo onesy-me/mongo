@@ -1,0 +1,57 @@
+---
+version: '3.8'
+
+services:
+  mongo1:
+    &mongo
+    image: mongo:4.2.10
+    container_name: mongo1
+    command: mongod --replSet 'rs0' --bind_ip 0.0.0.0 --port 27017
+    volumes:
+      - '~/.amaui/.mongo:/data/db'
+      - './utils/js/mongo/replica-set.js:/utils/js/mongo/replica-set.js'
+    ports:
+      - '27017:27017'
+
+  mongo2:
+    <<: *mongo
+    container_name: mongo2
+    command: mongod --replSet 'rs0' --bind_ip 0.0.0.0 --port 27018
+    volumes: []
+    ports:
+      - '27018:27018'
+
+  mongo3:
+    <<: *mongo
+    container_name: mongo3
+    command: mongod --replSet 'rs0' --bind_ip 0.0.0.0 --port 27019
+    volumes: []
+    ports:
+      - '27019:27019'
+
+  mongo1-test:
+    &mongo-test
+    image: mongo:4.2.10
+    container_name: mongo1-test
+    command: mongod --replSet 'rs1' --bind_ip 0.0.0.0 --port 47017
+    volumes:
+      - '~/.amaui/.test/.mongo:/data/db'
+      - './utils/js/mongo/replica-set.test.js:/utils/js/mongo/replica-set.test.js'
+    ports:
+      - '47017:47017'
+
+  mongo2-test:
+    <<: *mongo-test
+    container_name: mongo2-test
+    command: mongod --replSet 'rs1' --bind_ip 0.0.0.0 --port 47018
+    volumes: []
+    ports:
+      - '47018:47018'
+
+  mongo3-test:
+    <<: *mongo-test
+    container_name: mongo3-test
+    command: mongod --replSet 'rs1' --bind_ip 0.0.0.0 --port 47019
+    volumes: []
+    ports:
+      - '47019:47019'
