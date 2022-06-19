@@ -1,6 +1,6 @@
 {
   "name": "@amaui/mongo",
-  "version": "1.0.11",
+  "version": "1.0.111",
   "description": "Mongo",
   "repository": "https://github.com/amaui-org/amaui-mongo.git",
   "author": "Lazar <lazareric.com@gmail.com>",
@@ -39,16 +39,16 @@
     "mongodb": "^4.2.2"
   },
   "dependencies": {
-    "@amaui/date": "^1.0.1111",
+    "@amaui/date": "^1.0.11111",
     "@amaui/errors": "^1.0.111",
-    "@amaui/log": "^1.0.1111",
-    "@amaui/models": "^1.0.11",
-    "@amaui/subscription": "^1.0.1111",
-    "@amaui/utils": "^1.0.1874",
+    "@amaui/log": "^1.0.11111",
+    "@amaui/models": "^1.0.111",
+    "@amaui/subscription": "^1.0.1114",
+    "@amaui/utils": "^1.0.11111",
     "@babel/runtime": "^7.18.3"
   },
   "devDependencies": {
-    "@amaui/test": "^1.0.1114",
+    "@amaui/test": "^1.0.1141",
     "@babel/cli": "^7.16.0",
     "@babel/core": "^7.16.0",
     "@babel/plugin-proposal-class-properties": "^7.17.12",
@@ -56,9 +56,12 @@
     "@babel/plugin-transform-runtime": "^7.16.4",
     "@babel/preset-env": "^7.16.4",
     "@babel/preset-typescript": "^7.16.0",
+    "@types/express": "^4.17.13",
     "@types/mongodb": "^4.0.7",
     "@types/node": "^16.11.10",
     "cross-env": "^7.0.3",
+    "dotenv": "^16.0.1",
+    "express": "^4.18.1",
     "fast-glob": "^3.2.7",
     "fs-extra": "^10.0.0",
     "mongodb": "^4.3.1",
