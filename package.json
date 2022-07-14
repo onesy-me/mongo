@@ -1,6 +1,6 @@
 {
   "name": "@amaui/mongo",
-  "version": "1.0.11114",
+  "version": "1.0.11141",
   "description": "Mongo",
   "repository": "https://github.com/amaui-org/amaui-mongo.git",
   "author": "Lazar <lazareric.com@gmail.com>",
@@ -41,9 +41,9 @@
   "dependencies": {
     "@amaui/date": "^1.0.11414",
     "@amaui/errors": "^1.0.111",
-    "@amaui/log": "^1.0.11141",
+    "@amaui/log": "^1.0.11144",
     "@amaui/models": "^1.0.11114",
-    "@amaui/subscription": "^1.0.11144",
+    "@amaui/subscription": "^1.0.11147",
     "@amaui/utils": "^1.0.11411",
     "@babel/runtime": "^7.18.3"
   },
