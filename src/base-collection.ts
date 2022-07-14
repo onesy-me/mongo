@@ -1,10 +1,12 @@
 import * as mongodb from 'mongodb';
 import express from 'express';
 
-import { is, wait } from '@amaui/utils';
+import is from '@amaui/utils/is';
+import wait from '@amaui/utils/wait';
 import { TMethod, Query, IMongoQuery, getMongoMatch } from '@amaui/models';
 import { AmauiMongoError, DeveloperError } from '@amaui/errors';
-import { AmauiDate, duration } from '@amaui/date';
+import AmauiDate from '@amaui/date/amaui-date';
+import duration from '@amaui/date/duration';
 import AmauiLog from '@amaui/log';
 
 import Mongo, { IMongoSearchManyAdditional, IMongoSearchOneAdditional, MONGO_AGGREGATE_OPTIONS, MONGO_LIMIT_COUNT } from './mongo';

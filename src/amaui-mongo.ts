@@ -1,6 +1,7 @@
 import * as mongodb from 'mongodb';
 
-import { encode, getObjectValue } from '@amaui/utils';
+import encode from '@amaui/utils/encode';
+import getObjectValue from '@amaui/utils/getObjectValue';
 import { TObject } from '@amaui/models';
 
 import Mongo from './mongo';
