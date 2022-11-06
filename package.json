@@ -3,7 +3,7 @@
   "version": "1.0.11141",
   "description": "Mongo",
   "repository": "https://github.com/amaui-org/amaui-mongo.git",
-  "author": "Lazar <lazareric.com@gmail.com>",
+  "author": "Lazar <lazareric2@gmail.com>",
   "license": "MIT",
   "private": false,
   "main": "./src/index.ts",
