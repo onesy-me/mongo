@@ -48,11 +48,11 @@
 ### Use
 
 ```javascript
-  import { AmauiMongo, BaseCollection } from '@amaui/mongo';
+  import { Mongo, BaseCollection } from '@amaui/mongo';
   import { Query } from '@amaui/models';
 
   // Make a new mongo instance
-  const amauiMongo = new AmauiMongo({
+  const mongo = new Mongo({
     uri: process.env.db.mongo.uri,
     name: process.env.db.mongo.name,
   });

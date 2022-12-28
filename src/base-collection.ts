@@ -508,8 +508,6 @@ export class BaseCollection {
 
       const response = await collection.insertOne(value, options);
 
-      await wait(1400);
-
       return this.response(start, collection, 'addOne', { _id: response.insertedId, ...value });
     }
     catch (error) {
