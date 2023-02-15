@@ -38,11 +38,7 @@
 ### Add
 
 ```sh
-  // yarn
   yarn add @amaui/mongo
-
-  // npm
-  npm install @amaui/mongo
 ```
 
 ### Use
