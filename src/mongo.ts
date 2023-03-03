@@ -151,7 +151,7 @@ export class Mongo {
   // it drops the entire database,
   // usually used for testing only
   public async reset(db_name = 'test'): Promise<void> {
-    if (this.db && this.db.databaseName.indexOf(db_name) > -1) {
+    if (this.db && this.db.databaseName.includes(db_name)) {
       await this.db.dropDatabase();
 
       this.amalog.important(`Reset`);

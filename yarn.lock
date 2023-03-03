@@ -80,10 +80,10 @@
     "@amaui/utils" "^1.0.11114"
     "@babel/runtime" "^7.18.3"
 
-"@amaui/models@^1.0.11115":
-  version "1.0.11115"
-  resolved "https://registry.yarnpkg.com/@amaui/models/-/models-1.0.11115.tgz#210c2ef7986b30b1ed72cb3cd82e759dac519f30"
-  integrity sha512-s0c4LsOwY22J4bKFYU0G95B1chU0Bwjebdz7CKZM0kQ+zuPN6JZvAhJ1aB5uArPXvIk3cs+5Pt4jIPuBSlreYA==
+"@amaui/models@^1.0.1114":
+  version "1.0.1114"
+  resolved "https://registry.yarnpkg.com/@amaui/models/-/models-1.0.1114.tgz#9d7358275ae66a73940ffa597b0053f6f1efc1e5"
+  integrity sha512-0IT95Xm8R1f/izxxTMqqPdoHrGdqRMmJminN6qcbSXZNgk+0kcp6c03y+xVxa8+jk2j4I/l/Nfb8oBybuY1Rkw==
   dependencies:
     "@amaui/errors" "^1.0.111"
     "@amaui/utils" "^1.0.11447"

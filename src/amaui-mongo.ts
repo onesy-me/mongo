@@ -21,7 +21,7 @@ export class AmauiMongo {
         const sortValue = sort[property];
         let operator = type === 'next' ? '$gt' : '$lt';
 
-        if (['dsc', 'descending', -1].indexOf(sortValue) > -1) operator = type === 'next' ? '$lt' : '$gt';
+        if (['dsc', 'descending', -1].includes(sortValue)) operator = type === 'next' ? '$lt' : '$gt';
 
         value[property] = { [operator]: value_ };
       }

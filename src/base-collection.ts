@@ -3,6 +3,7 @@ import express from 'express';
 
 import is from '@amaui/utils/is';
 import wait from '@amaui/utils/wait';
+import setObjectValue from '@amaui/utils/setObjectValue';
 import { TMethod, Query, IMongoQuery, getMongoMatch } from '@amaui/models';
 import { AmauiMongoError, DeveloperError } from '@amaui/errors';
 import AmauiDate from '@amaui/date/amaui-date';
@@ -42,6 +43,10 @@ export class BaseCollection {
   public get paginatedField(): string { return 'api_meta.added_at'; }
 
   public get paginatedAscending(): number { return -1; }
+
+  public get addedField(): string { return 'api_meta.added_at'; }
+
+  public get updatedField(): string { return 'api_meta.updated_at'; }
 
   public get projection(): object {
     if (['stripe'].some(name => this.collectionName.indexOf(name) > -1)) return;
@@ -409,15 +414,17 @@ export class BaseCollection {
     query: Query,
     value?: any,
     operators: mongodb.UpdateFilter<any> = {},
-    options: mongodb.FindOneAndUpdateOptions = {}
+    options_: mongodb.FindOneAndUpdateOptions & { update_date?: boolean } = {}
   ): Promise<mongodb.ModifyResult<mongodb.Document>> {
+    const options = { update_date: true, ...options_ };
+
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      if (!is('object', value)) throw new AmauiMongoError(`Value has to be an object with fields and values`);
+      if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      value['api_meta.updated_at'] = AmauiDate.utc.unix;
+      if (is('object', value) && options.update_date) value[this.updatedField || 'api_meta.updated_at'] = AmauiDate.utc.unix;
 
       const response = await collection.findOneAndUpdate(
         query.queries.find[this.collectionName],
@@ -465,15 +472,17 @@ export class BaseCollection {
   public async updateOneOrAdd(
     query: Query,
     value: any,
-    options: mongodb.FindOneAndUpdateOptions = {}
+    options_: mongodb.FindOneAndUpdateOptions & { update_date?: boolean } = {}
   ): Promise<mongodb.ModifyResult<mongodb.Document>> {
+    const options = { update_date: true, ...options_ };
+
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      if (!is('object', value)) throw new AmauiMongoError(`Value has to be an object with fields and values`);
+      if (!is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      value['api_meta.added_at'] = AmauiDate.utc.unix;
+      if (options.update_date) value[this.updatedField || 'api_meta.updated_at'] = AmauiDate.utc.unix;
 
       const response = await collection.findOneAndUpdate(
         query.queries.find[this.collectionName],
@@ -498,13 +507,17 @@ export class BaseCollection {
 
   public async addOne(
     value: any,
-    options: mongodb.InsertOneOptions = {}
+    options_: mongodb.InsertOneOptions & { add_date?: boolean } = {}
   ): Promise<mongodb.Document> {
+    const options = { add_date: true, ...options_ };
+
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
       if (!value) throw new AmauiMongoError(`No value provided`);
+
+      if (options.add_date) setObjectValue(value, this.addedField || 'api_meta.added_at', AmauiDate.utc.unix);
 
       const response = await collection.insertOne(value, options);
 
@@ -518,16 +531,32 @@ export class BaseCollection {
   }
 
   public async addMany(
-    values: any[],
-    options: mongodb.BulkWriteOptions = {}
+    values_: any[],
+    options_: mongodb.BulkWriteOptions & { add_date?: boolean } = {}
   ): Promise<Array<mongodb.Document>> {
+    const options = { add_date: true, ...options_ };
+
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
+      let values = values_;
+
       if (!values?.length) throw new AmauiMongoError(`Values have to be a non empty array`);
 
-      const response = await collection.insertMany(values, options);
+      if (options.add_date) values = values.map(item => {
+        setObjectValue(item, this.addedField || 'api_meta.added_at', AmauiDate.utc.unix);
+
+        return item;
+      });
+
+      const response = await collection.insertMany(
+        values,
+        {
+          ordered: false,
+          ...options
+        }
+      );
 
       return this.response(start, collection, 'addMany', values.map((value, index) => ({ _id: response.insertedIds[index], ...value })));
     }
@@ -542,15 +571,17 @@ export class BaseCollection {
     query: Query,
     value?: any,
     operators: mongodb.UpdateFilter<any> = {},
-    options: mongodb.UpdateOptions = {}
+    options_: mongodb.UpdateOptions & { update_date?: boolean } = {}
   ): Promise<number> {
+    const options = { update_date: true, ...options_ };
+
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      if (!is('object', value)) throw new AmauiMongoError(`Value has to be an object with fields and values`);
+      if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      value['api_meta.updated_at'] = AmauiDate.utc.unix;
+      if (is('object', value) && options.update_date) value[this.updatedField || 'api_meta.updated_at'] = AmauiDate.utc.unix;
 
       const response = await collection.updateMany(
         query.queries.find[this.collectionName],
@@ -558,7 +589,9 @@ export class BaseCollection {
           ...(value ? { $set: value } : {}),
           ...operators,
         },
-        options,
+        {
+          ...options
+        },
       );
 
       return this.response(start, collection, 'updateMany', response.modifiedCount);
@@ -572,7 +605,7 @@ export class BaseCollection {
 
   public async removeMany(
     query: Query,
-    options: mongodb.DeleteOptions = {}
+    options: mongodb.DeleteOptions = { ordered: false }
   ): Promise<number> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
@@ -580,7 +613,10 @@ export class BaseCollection {
     try {
       const response = await collection.deleteMany(
         query.queries.find[this.collectionName],
-        options
+        {
+          ordered: false,
+          ...options
+        }
       );
 
       return this.response(start, collection, 'removeMany', response.deletedCount);

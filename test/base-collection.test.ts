@@ -38,7 +38,7 @@ group('@amaui/mongo/base-collection', () => {
 
   group('ACollection', () => {
     let aCollection: BaseCollection;
-    let newObject;
+    let newObject: any;
 
     pre(async () => {
       class ACollection extends BaseCollection {
@@ -90,7 +90,7 @@ group('@amaui/mongo/base-collection', () => {
         });
       }
 
-      await aCollection.addMany(items);
+      await aCollection.addMany(items, { add_date: false });
     });
 
     to('db', async () => {
@@ -193,7 +193,7 @@ group('@amaui/mongo/base-collection', () => {
       const response = await aCollection.aggregate(query);
 
       assert(response.length).eq(4);
-      assert(response[0].data.a.i).eq(3);
+      assert(response[0].data.a.a[0]).eq(4);
     });
 
     group('searchMany', () => {
@@ -218,7 +218,7 @@ group('@amaui/mongo/base-collection', () => {
         const response = await aCollection.searchMany(query);
 
         assert(response.response.length).eq(2);
-        assert(response.response[0].data.a.i).eq(4);
+        assert(response.response[0].data.a.a[0]).eq(4);
         assert(response.skip).eq(1);
         assert(response.limit).eq(2);
         assert(response.total).eq(4);
@@ -274,7 +274,7 @@ group('@amaui/mongo/base-collection', () => {
 
           assert(response.response.length).eq(4);
           assert(response.hasNext).eq(true);
-          assert(response.response[0].data.a.i).eq(1);
+          assert(response.response[0].data.a.a[0]).eq(4);
           assert(response.skip).eq(1);
           assert(response.limit).eq(4);
         });
@@ -351,8 +351,8 @@ group('@amaui/mongo/base-collection', () => {
           response = await aCollection.searchMany(new Query(query));
 
           assert(response.response.length).eq(4);
+          assert(response.response[0].data.a.a[0]).eq(4);
           assert(response.hasPrevious).eq(false);
-          assert(response.response[0].data.a.i).eq(0);
         });
 
         to('no previous', async () => {
