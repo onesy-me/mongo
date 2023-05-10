@@ -10,8 +10,24 @@ import AmauiDate from '@amaui/date/amaui-date';
 import duration from '@amaui/date/duration';
 import AmauiLog from '@amaui/log';
 
-import Mongo, { IMongoSearchManyAdditional, IMongoSearchOneAdditional, MONGO_AGGREGATE_OPTIONS, MONGO_LIMIT_COUNT } from './mongo';
-import AmauiMongo from './amaui-mongo';
+import Mongo, { IMongoSearchManyAdditional, IMongoSearchOneAdditional, MONGO_AGGREGATE_OPTIONS, MONGO_LIMIT_COUNT } from './Mongo';
+import AmauiMongo from './AmauiMongo';
+
+export interface IUpdateOptions extends mongodb.FindOneAndUpdateOptions {
+  update_date?: boolean;
+}
+
+export interface IUpdateManyOptions extends mongodb.UpdateOptions {
+  update_date?: boolean;
+}
+
+export interface IAddOneOptions extends mongodb.InsertOneOptions {
+  add_date?: boolean;
+}
+
+export interface IAddManyOptions extends mongodb.BulkWriteOptions {
+  add_date?: boolean;
+}
 
 export class BaseCollection {
   private db_: mongodb.Db;
@@ -414,7 +430,7 @@ export class BaseCollection {
     query: Query,
     value?: any,
     operators: mongodb.UpdateFilter<any> = {},
-    options_: mongodb.FindOneAndUpdateOptions & { update_date?: boolean } = {}
+    options_: IUpdateOptions = {}
   ): Promise<mongodb.ModifyResult<mongodb.Document>> {
     const options = { update_date: true, ...options_ };
 
@@ -472,7 +488,7 @@ export class BaseCollection {
   public async updateOneOrAdd(
     query: Query,
     value: any,
-    options_: mongodb.FindOneAndUpdateOptions & { update_date?: boolean } = {}
+    options_: IUpdateOptions = {}
   ): Promise<mongodb.ModifyResult<mongodb.Document>> {
     const options = { update_date: true, ...options_ };
 
@@ -507,7 +523,7 @@ export class BaseCollection {
 
   public async addOne(
     value: any,
-    options_: mongodb.InsertOneOptions & { add_date?: boolean } = {}
+    options_: IAddOneOptions = {}
   ): Promise<mongodb.Document> {
     const options = { add_date: true, ...options_ };
 
@@ -532,7 +548,7 @@ export class BaseCollection {
 
   public async addMany(
     values_: any[],
-    options_: mongodb.BulkWriteOptions & { add_date?: boolean } = {}
+    options_: IAddManyOptions = {}
   ): Promise<Array<mongodb.Document>> {
     const options = { add_date: true, ...options_ };
 
@@ -571,7 +587,7 @@ export class BaseCollection {
     query: Query,
     value?: any,
     operators: mongodb.UpdateFilter<any> = {},
-    options_: mongodb.UpdateOptions & { update_date?: boolean } = {}
+    options_: IUpdateManyOptions = {}
   ): Promise<number> {
     const options = { update_date: true, ...options_ };
 

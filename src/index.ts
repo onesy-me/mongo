@@ -1,8 +1,8 @@
 
-export { default as Mongo } from './mongo';
+export { default as Mongo } from './Mongo';
 
-export * from './mongo';
+export * from './Mongo';
 
-export { default as BaseCollection } from './base-collection';
+export { default as BaseCollection } from './BaseCollection';
 
-export { default as AmauiMongo } from './amaui-mongo';
+export { default as AmauiMongo } from './AmauiMongo';

@@ -10,7 +10,7 @@ const options = {
   name: Config.config.db.mongo.name,
 };
 
-group('@amaui/mongo/mongo', () => {
+group('Mongo', () => {
   let mongo: Mongo;
   const messages = [];
 

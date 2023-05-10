@@ -16,7 +16,7 @@ const options = {
   name: Config.config.db.mongo.name,
 };
 
-group('@amaui/mongo/base-collection', () => {
+group('BaseCollection', () => {
   let mongo: Mongo;
   const messages = [];
 

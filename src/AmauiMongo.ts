@@ -4,7 +4,7 @@ import encode from '@amaui/utils/encode';
 import getObjectValue from '@amaui/utils/getObjectValue';
 import { TObject } from '@amaui/models';
 
-import Mongo from './mongo';
+import Mongo from './Mongo';
 
 export class AmauiMongo {
   public static Mongo_ = new Mongo();
