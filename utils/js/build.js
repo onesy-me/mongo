@@ -61,6 +61,38 @@ async function buildBabel(variant = 'esm') {
   if (response) console.log(response);
 }
 
+async function buildUMD() {
+  const { log } = cache;
+
+  const env = {
+    BABEL_ENV: 'esm',
+  };
+  const rollup = path.resolve(__dirname, '../../rollup.config.js');
+
+  const arguments = [
+    '-c',
+    rollup,
+  ];
+
+  const cmd = ['rollup', ...arguments].join(' ');
+
+  if (log) console.log(`\n🌱 Running ${cmd}\n`);
+
+  const [error, response] = await exec(cmd, { env: { ...process.env, ...env } });
+
+  if (error) {
+    console.error(error);
+
+    if (response) console.error(response);
+
+    console.log();
+
+    throw new Error();
+  }
+
+  if (response) console.log(response.slice(1, -1));
+}
+
 async function build() {
   const { log } = cache;
 
@@ -71,6 +103,9 @@ async function build() {
 
   // Node
   await buildBabel('node');
+
+  // UMD
+  await buildUMD();
 
   if (log) console.log(`🌱 Build done\n`);
 }
@@ -131,7 +166,7 @@ async function addLicense() {
       if (exists) {
         const data = await fse.readFile(filePath, 'utf8');
 
-        if (data.indexOf('@license AMAUI') === -1) await fse.writeFile(filePath, license + data, 'utf8');
+        if (data.indexOf('@license amaui') === -1) await fse.writeFile(filePath, license + data, 'utf8');
       }
     })
   );
@@ -210,20 +245,6 @@ const capitalizedCammelCase = value => capitalizeCammelCase(kebabCasetoCammelCas
 async function docsUpdateTypes(pathTypes, pathUse, isModules) {
   let data = await fse.readFile(pathTypes, 'utf8');
 
-  data = data.split('\n')
-    .filter(Boolean)
-    .filter(item => !['import'].some(value => item.indexOf(value) === 0))
-    .map(item => {
-      let value = item;
-
-      if (item.startsWith('declare ')) value = value.slice(8);
-
-      if (item.startsWith('export ')) value = value.slice(7);
-
-      return value;
-    })
-    .join('\n');
-
   let name = (path.parse(pathTypes).name).replace('.d', '').replace(/[\(\):]/gi, '');
 
   name = name.includes('-') ? capitalizedCammelCase(name) : name;
@@ -247,16 +268,31 @@ async function docsUpdateTypes(pathTypes, pathUse, isModules) {
     values = values.filter(Boolean);
   }
 
-  const parts = data.match(/((type|const) [^{|\n]+{\n[^}]+};)|((type|const|function|default function) [^\n]+)|((interface|class|default class) [^}]+};?(\n|$))/ig) || [];
+  let parts = [];
 
-  console.log(1, parts);
+  data.split('\n').forEach(item => {
+    if ([' ', '}'].includes(item[0])) parts[parts.length - 1] += `\n${item}`;
+    else parts.push(item);
+  });
+
+  parts = parts
+    .filter(Boolean)
+    .map(item => item.replace(/(export|declare) /g, ''))
+    .filter(item => {
+      const partName = (item.replace('default ', '').match(/(?!default|type|interface|const|function|class) [^ \(\)\{\}\<\:]+/i) || [])[0]?.trim();
+
+      return (
+        !item.startsWith('import') &&
+        !!partName
+      );
+    });
 
   let valueNew = `\n\n### API\n\n`;
 
-  parts.forEach(part => {
-    const partName = (part.replace('default ', '').match(/(?!type|interface|const|function|class) [^ \(\)\{\}\<\:]+/i) || [])[0]?.trim();
+  parts.forEach(item => {
+    const partName = (item.replace('default ', '').match(/(?!default|type|interface|const|function|class) [^ \(\)\{\}\<\:]+/i) || [])[0]?.trim();
 
-    valueNew += `#### ${partName}\n\n\`\`\`ts\n${part.trim()}\n\`\`\`\n\n`;
+    valueNew += `#### ${partName}\n\n\`\`\`ts\n${item.trim()}\n\`\`\`\n\n`;
   });
 
   // Update values value
