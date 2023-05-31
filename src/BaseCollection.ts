@@ -4,13 +4,13 @@ import express from 'express';
 import is from '@amaui/utils/is';
 import wait from '@amaui/utils/wait';
 import setObjectValue from '@amaui/utils/setObjectValue';
-import { TMethod, Query, IMongoQuery, getMongoMatch } from '@amaui/models';
+import { TMethod, Query, IMongoResponse, getMongoMatch, IMongoSearchManyAdditional, IMongoSearchOneAdditional, MongoResponse, } from '@amaui/models';
 import { AmauiMongoError, DeveloperError } from '@amaui/errors';
 import AmauiDate from '@amaui/date/amaui-date';
 import duration from '@amaui/date/duration';
 import AmauiLog from '@amaui/log';
 
-import Mongo, { IMongoSearchManyAdditional, IMongoSearchOneAdditional, MONGO_AGGREGATE_OPTIONS, MONGO_LIMIT_COUNT } from './Mongo';
+import Mongo from './Mongo';
 import AmauiMongo from './AmauiMongo';
 
 export interface IUpdateOptions extends mongodb.FindOneAndUpdateOptions {
@@ -56,23 +56,27 @@ export class BaseCollection {
     }));
   }
 
-  public get paginatedField(): string { return 'api_meta.added_at'; }
+  public get sort(): Record<string, number> {
+    return {
+      [this.sortProperty]: this.sortAscending
+    };
+  }
 
-  public get paginatedAscending(): number { return -1; }
+  public get sortProperty(): string { return 'api_meta.added_at'; }
 
-  public get addedField(): string { return 'api_meta.added_at'; }
+  public get sortAscending(): number { return -1; }
 
-  public get updatedField(): string { return 'api_meta.updated_at'; }
+  public get addedProperty(): string { return 'api_meta.added_at'; }
+
+  public get updatedProperty(): string { return 'api_meta.updated_at'; }
 
   public get projection(): object {
-    if (['stripe'].some(name => this.collectionName.indexOf(name) > -1)) return;
 
     return {
       _id: 1,
-      meta: '$$ROOT.meta',
-      data: '$$ROOT.data',
-      namespace: '$$ROOT.namespace',
-      api_meta: '$$ROOT.api_meta',
+      meta: 1,
+      data: 1,
+      api_meta: 1
     };
   }
 
@@ -104,7 +108,7 @@ export class BaseCollection {
     return this.collections[name];
   }
 
-  public async transaction(method: TMethod): Promise<void | Error> {
+  public async transaction(method: TMethod, options = { retries: 5, retriesWait: 140 }): Promise<void | Error> {
     if (!is('function', method)) throw new DeveloperError('First argument has to be a function');
 
     const transactionOptions: mongodb.TransactionOptions = {
@@ -114,10 +118,13 @@ export class BaseCollection {
     };
 
     let response: any;
-    let retries = 5;
+
+    const retriesTotal = is('number', options.retries) ? options.retries : 5;
+    const retriesWait = is('number', options.retriesWait) ? options.retriesWait : 140;
+    let retries = retriesTotal;
+
     let error: Error;
     let codeName = 'WriteConflict';
-    const RETRY_WAIT = 144;
 
     while (
       codeName === 'WriteConflict' &&
@@ -126,7 +133,7 @@ export class BaseCollection {
       error = undefined;
       codeName = undefined;
 
-      if (retries < 3) await wait(RETRY_WAIT);
+      if (retries < retriesTotal) await wait(retriesWait);
 
       const session = this.mongo.client.startSession();
 
@@ -141,7 +148,7 @@ export class BaseCollection {
         await session.endSession();
       }
 
-      retries -= 1;
+      retries--;
     }
 
     if (error) throw new DeveloperError(error);
@@ -150,14 +157,17 @@ export class BaseCollection {
   }
 
   public async count(
-    query?: Query,
+    query: Query = new Query(),
     options: mongodb.CountDocumentsOptions = {}
   ): Promise<number> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      const response = await collection.countDocuments(query?.queries.find[this.collectionName] || {}, options);
+      const response = await collection.countDocuments(
+        query?.queries.find[this.collectionName] || {},
+        options
+      );
 
       return this.response(start, collection, 'count', response);
     }
@@ -169,17 +179,20 @@ export class BaseCollection {
   }
 
   public async exists(
-    value: Array<object> = [],
-    operator: '$and' | '$or' = '$and',
+    query: Query,
     options: mongodb.FindOptions = {}
   ): Promise<boolean> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      if (!value.length) throw new AmauiMongoError('First argument has to be an array with at least one query');
-
-      const response = await collection.findOne({ [operator]: value }, { projection: { _id: 1 }, ...options });
+      const response = await collection.findOne(
+        query?.queries?.find[this.collectionName] || {},
+        {
+          projection: { _id: 1 },
+          ...options
+        }
+      );
 
       return this.response(start, collection, 'exists', !!response);
     }
@@ -193,24 +206,32 @@ export class BaseCollection {
   public async find(
     query: Query,
     options: mongodb.FindOptions = {}
-  ): Promise<IMongoQuery> {
+  ): Promise<IMongoResponse> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
       if (!options.projection) options.projection = query.projection || this.projection;
-      if (!options.sort) options.sort = (query.sort || { [this.paginatedField]: this.paginatedAscending } as mongodb.Sort);
+      if (!options.sort) options.sort = (query.sort || this.sort as mongodb.Sort);
       if (!options.skip) options.skip = query.skip || 0;
-      if (!options.limit) options.limit = query.limit || 40;
+      if (!options.limit) options.limit = query.limit || 15;
 
-      const response_ = collection.find(query.queries.find[this.collectionName], options);
+      const response_ = await collection.find(
+        query.queries.find[this.collectionName],
+        options
+      ).toArray();
 
-      const response = {
-        response: await response_.toArray(),
-        ...options,
-      };
+      const response = new MongoResponse(response_);
 
-      if (query.total) response['total'] = await collection.find(query.queries.find[this.collectionName], { projection: { _id: 1 } }).count();
+      response.sort = options.sort as any;
+      response.size = response_.length;
+      response.skip = options.skip;
+      response.limit = options.limit;
+
+      if (query.total) response['total'] = await collection.find(
+        query.queries.find[this.collectionName],
+        { projection: { _id: 1 } }
+      ).count();
 
       return this.response(start, collection, 'find', response);
     }
@@ -231,7 +252,10 @@ export class BaseCollection {
     try {
       if (!options.projection) options.projection = query.projection || this.projection;
 
-      const response = collection.findOne(query?.queries.find[this.collectionName] || {}, options);
+      const response = collection.findOne(
+        query?.queries.find[this.collectionName] || {},
+        options
+      );
 
       return this.response(start, collection, 'findOne', response);
     }
@@ -243,16 +267,22 @@ export class BaseCollection {
   }
 
   public async aggregate(
-    query?: Query,
+    query: Query = new Query(),
     options: mongodb.AggregateOptions = {}
   ): Promise<Array<mongodb.Document>> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      const value = query ? query.queries.aggregate[this.collectionName] : [];
+      const value = query?.queries?.aggregate?.[this.collectionName] || [];
 
-      const response = collection.aggregate(value, { ...MONGO_AGGREGATE_OPTIONS, ...options }).toArray();
+      const response = collection.aggregate(
+        value,
+        {
+          ...Mongo.defaults.aggregateOptions,
+          ...options
+        }
+      ).toArray();
 
       return this.response(start, collection, 'aggregate', response);
     }
@@ -267,13 +297,13 @@ export class BaseCollection {
     query: Query,
     additional: IMongoSearchManyAdditional = { pre: [], prePagination: [], post: [] },
     options: mongodb.AggregateOptions = {}
-  ): Promise<IMongoQuery> {
+  ): Promise<IMongoResponse> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
       const projection = query.projection || this.projection;
-      const sort = (query.sort || { [this.paginatedField]: this.paginatedAscending } as mongodb.Sort);
+      const sort = query.sort || this.sort as mongodb.Sort;
       const { limit, next, previous, skip } = query;
       const hasPaginator = next || previous;
 
@@ -285,10 +315,13 @@ export class BaseCollection {
         search: query.queries.search[this.collectionName],
         api: query.queries.api[this.collectionName],
         permissions: query.queries.permissions[this.collectionName],
+        aggregate: query.queries.aggregate[this.collectionName] || [],
       };
 
       const queryMongo = [
         ...pre,
+
+        ...queries.aggregate,
 
         // Search
         ...(queries.search.length ? getMongoMatch(queries.search, query.settings.type) : []),
@@ -307,6 +340,7 @@ export class BaseCollection {
 
         // Next paginator
         ...(next ? getMongoMatch([next as Record<string, any>]) : []),
+
         // Previous paginator
         ...(previous ? getMongoMatch([previous as Record<string, any>]) : []),
 
@@ -323,39 +357,46 @@ export class BaseCollection {
         ...post,
       ];
 
-      const response_ = await collection.aggregate(pipeline, { ...MONGO_AGGREGATE_OPTIONS, ...options }).toArray();
+      const response_ = await collection.aggregate(pipeline, { ...Mongo.defaults.aggregateOptions, ...options }).toArray();
 
       // Add results and limit
       const objects = response_.slice(0, limit);
       const first = objects[0];
       const last = objects[objects.length - 1];
 
-      const response = {
-        response: objects,
-        sort,
-        skip,
-        limit,
-      };
+      const response = new MongoResponse(objects);
+
+      response.sort = sort as any;
+      response.skip = skip;
+      response.limit = limit;
 
       // Add hasNext, next, previous
       response['hasNext'] = response_.length > objects.length;
+
       response['hasPrevious'] = !!(objects.length && (skip > 0 || next));
 
-      if (last) response['next'] = AmauiMongo.createPaginator(last, [this.paginatedField], sort);
-      if (first) response['previous'] = AmauiMongo.createPaginator(first, [this.paginatedField], sort, 'previous');
+      if (last) response['next'] = AmauiMongo.createPaginator(last, [this.sortProperty], sort);
+
+      if (first) response['previous'] = AmauiMongo.createPaginator(first, [this.sortProperty], sort, 'previous');
 
       // Count total only if it's requested by the query
       let total: number;
 
       if (query.total) {
-        const total_ = await collection.aggregate([
-          ...queryMongo,
+        const total_ = await collection.aggregate(
+          [
+            ...queryMongo,
 
-          // Limit count for performance reasons
-          { $limit: MONGO_LIMIT_COUNT },
+            // Limit count for performance reasons
+            { $limit: Mongo.defaults.limitCount },
 
-          { $group: { _id: null, count: { $sum: 1 } } },
-        ], { ...MONGO_AGGREGATE_OPTIONS, ...options }).toArray();
+            { $group: { _id: null, count: { $sum: 1 } } },
+          ],
+          {
+            ...Mongo.defaults.aggregateOptions,
+            ...options
+          }
+        ).toArray();
 
         total = total_[0] && total_[0].count;
 
@@ -390,10 +431,13 @@ export class BaseCollection {
         search: query.queries.search[this.collectionName],
         api: query.queries.api[this.collectionName],
         permissions: query.queries.permissions[this.collectionName],
+        aggregate: query.queries.aggregate[this.collectionName] || [],
       };
 
       const queryMongo = [
         ...pre,
+
+        ...queries.aggregate,
 
         // Search
         ...(queries.search.length ? getMongoMatch(queries.search, query.settings.type) : []),
@@ -415,12 +459,43 @@ export class BaseCollection {
         ...post,
       ];
 
-      const response = await collection.aggregate(pipeline, { ...MONGO_AGGREGATE_OPTIONS, ...options }).toArray();
+      const response = await collection.aggregate(
+        pipeline,
+        {
+          ...Mongo.defaults.aggregateOptions,
+          ...options
+        }
+      ).toArray();
 
       return this.response(start, collection, 'searchOne', response[0]);
     }
     catch (error) {
       this.response(start, collection, 'searchOne');
+
+      throw new AmauiMongoError(error);
+    }
+  }
+
+  public async addOne(
+    value: any,
+    options_: IAddOneOptions = {}
+  ): Promise<mongodb.Document> {
+    const options = { add_date: true, ...options_ };
+
+    const collection = await this.collection();
+    const start = AmauiDate.utc.milliseconds;
+
+    try {
+      if (!value) throw new AmauiMongoError(`No value provided`);
+
+      if (options.add_date) setObjectValue(value, this.addedProperty || 'api_meta.added_at', AmauiDate.utc.unix);
+
+      const response = await collection.insertOne(value, options);
+
+      return this.response(start, collection, 'addOne', { _id: response.insertedId, ...value });
+    }
+    catch (error) {
+      this.response(start, collection, 'addOne');
 
       throw new AmauiMongoError(error);
     }
@@ -440,7 +515,7 @@ export class BaseCollection {
     try {
       if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      if (is('object', value) && options.update_date) value[this.updatedField || 'api_meta.updated_at'] = AmauiDate.utc.unix;
+      if (is('object', value) && options.update_date) value[this.updatedProperty || 'api_meta.updated_at'] = AmauiDate.utc.unix;
 
       const response = await collection.findOneAndUpdate(
         query.queries.find[this.collectionName],
@@ -490,7 +565,7 @@ export class BaseCollection {
     value: any,
     options_: IUpdateOptions = {}
   ): Promise<mongodb.ModifyResult<mongodb.Document>> {
-    const options = { update_date: true, ...options_ };
+    const options = { add_date: true, update_date: true, ...options_ };
 
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
@@ -498,12 +573,19 @@ export class BaseCollection {
     try {
       if (!is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      if (options.update_date) value[this.updatedField || 'api_meta.updated_at'] = AmauiDate.utc.unix;
+      if (options.update_date) value[this.updatedProperty || 'api_meta.updated_at'] = AmauiDate.utc.unix;
+
+      let setOnInsert: any;
+
+      if (options.add_date) setOnInsert = {
+        [this.addedProperty || 'api_meta.added_at']: AmauiDate.utc.unix
+      };
 
       const response = await collection.findOneAndUpdate(
         query.queries.find[this.collectionName],
         {
           $set: value,
+          ...(setOnInsert && { $setOnInsert: setOnInsert })
         },
         {
           ...options,
@@ -516,31 +598,6 @@ export class BaseCollection {
     }
     catch (error) {
       this.response(start, collection, 'updateOneOrAdd');
-
-      throw new AmauiMongoError(error);
-    }
-  }
-
-  public async addOne(
-    value: any,
-    options_: IAddOneOptions = {}
-  ): Promise<mongodb.Document> {
-    const options = { add_date: true, ...options_ };
-
-    const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
-
-    try {
-      if (!value) throw new AmauiMongoError(`No value provided`);
-
-      if (options.add_date) setObjectValue(value, this.addedField || 'api_meta.added_at', AmauiDate.utc.unix);
-
-      const response = await collection.insertOne(value, options);
-
-      return this.response(start, collection, 'addOne', { _id: response.insertedId, ...value });
-    }
-    catch (error) {
-      this.response(start, collection, 'addOne');
 
       throw new AmauiMongoError(error);
     }
@@ -561,7 +618,7 @@ export class BaseCollection {
       if (!values?.length) throw new AmauiMongoError(`Values have to be a non empty array`);
 
       if (options.add_date) values = values.map(item => {
-        setObjectValue(item, this.addedField || 'api_meta.added_at', AmauiDate.utc.unix);
+        setObjectValue(item, this.addedProperty || 'api_meta.added_at', AmauiDate.utc.unix);
 
         return item;
       });
@@ -597,7 +654,7 @@ export class BaseCollection {
     try {
       if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      if (is('object', value) && options.update_date) value[this.updatedField || 'api_meta.updated_at'] = AmauiDate.utc.unix;
+      if (is('object', value) && options.update_date) value[this.updatedProperty || 'api_meta.updated_at'] = AmauiDate.utc.unix;
 
       const response = await collection.updateMany(
         query.queries.find[this.collectionName],
@@ -639,6 +696,35 @@ export class BaseCollection {
     }
     catch (error) {
       this.response(start, collection, 'removeMany');
+
+      throw new AmauiMongoError(error);
+    }
+  }
+
+  public async bulkWrite(
+    values: mongodb.AnyBulkWriteOperation[] = [],
+    options_: mongodb.BulkWriteOptions = {}
+  ): Promise<Array<mongodb.Document>> {
+    const options = { ...options_ };
+
+    const collection = await this.collection();
+    const start = AmauiDate.utc.milliseconds;
+
+    try {
+      if (!values?.length) throw new AmauiMongoError(`Values have to be a non empty array`);
+
+      const response = await collection.bulkWrite(
+        values,
+        {
+          ordered: false,
+          ...options
+        }
+      );
+
+      return this.response(start, collection, 'bulkWrite', values.map((value, index) => ({ _id: response.insertedIds[index], ...value })));
+    }
+    catch (error) {
+      this.response(start, collection, 'bulkWrite');
 
       throw new AmauiMongoError(error);
     }

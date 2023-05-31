@@ -31,7 +31,7 @@ group('BaseCollection', () => {
   postTo(async () => await mongo.connection);
 
   post(async () => {
-    await mongo.reset();
+    await mongo.reset('test');
 
     AmauiLog.options.log.enabled = true;
   });
@@ -100,11 +100,11 @@ group('BaseCollection', () => {
       assert(db.collection).exist;
     });
 
-    to('paginatedField', () => assert(aCollection.paginatedField).eq('api_meta.added_at'));
+    to('sort', () => assert(aCollection.sort).eq('api_meta.added_at'));
 
-    to('paginatedAscending', () => assert(aCollection.paginatedAscending).eq(-1));
+    to('sortAscending', () => assert(aCollection.sortAscending).eq(-1));
 
-    to('paginatedAscending', () => assert(aCollection.projection).eql({
+    to('projection', () => assert(aCollection.projection).eql({
       _id: 1,
       meta: '$$ROOT.meta',
       data: '$$ROOT.data',
@@ -145,10 +145,10 @@ group('BaseCollection', () => {
     });
 
     to('exists', async () => {
-      assert(await aCollection.exists([{ 'data.a.a': 4 }, { 'data.a.a': 14 }], '$or')).eq(true);
-      assert(await aCollection.exists([{ 'data.a.a': 4 }, { 'data.a.a': 14 }])).eq(false);
-      assert(await aCollection.exists([{ 'data.a.a.a': 40 }])).eq(true);
-      assert(await aCollection.exists([{ 'data.a.a.a': 41 }])).eq(false);
+      assert(await aCollection.exists(new Query({ queries: { find: { a: { $or: [{ 'data.a.a': 4 }, { 'data.a.a': 14 }] } } } }))).eq(true);
+      assert(await aCollection.exists(new Query({ queries: { find: { a: { $and: [{ 'data.a.a': 4 }, { 'data.a.a': 14 }] } } } }))).eq(false);
+      assert(await aCollection.exists(new Query({ queries: { find: { a: { 'data.a.a.a': 40 } } } }))).eq(true);
+      assert(await aCollection.exists(new Query({ queries: { find: { a: { 'data.a.a.a': 41 } } } }))).eq(false);
     });
 
     to('find', async () => {
@@ -470,7 +470,7 @@ group('BaseCollection', () => {
 
     to('addMany', async () => {
       const response = await aCollection.addMany([
-        { a: 4440 },
+        { _id: 'ai1', a: 4440 },
         { a: 4440 },
         { a: 4440 },
         { a: 4440 },
@@ -527,6 +527,38 @@ group('BaseCollection', () => {
 
       assert(response).eq(4);
       assert(items.length).eq(0);
+    });
+
+    to('bulkWrite', async () => {
+      const id = new mongodb.ObjectId();
+
+      const response = await aCollection.bulkWrite(
+        [
+          { insertOne: { document: { _id: id, a: 114 } } },
+          { updateOne: { filter: { _id: newObject._id }, update: { 'data.a.a': 1114 } } },
+          { deleteOne: { filter: { _id: 'ai1' } } }
+        ]
+      );
+
+      const items = await aCollection.aggregate(new Query({
+        queries: {
+          aggregate: {
+            a: [
+              {
+                $match: {
+                  _id: { $in: [id, newObject._id, 'ai1'] }
+                }
+              }
+            ]
+          }
+        }
+      }));
+
+      const responseNewObject = items.find(item => String(item._id) === String(newObject._id));
+
+      assert(items.length).eq(2);
+
+      assert(responseNewObject?.data?.a?.a).eq(1114);
     });
 
   });

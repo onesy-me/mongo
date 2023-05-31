@@ -21,7 +21,7 @@ group('Mongo', () => {
   });
 
   post(async () => {
-    await mongo.reset();
+    await mongo.reset('test');
   });
 
   group('Mongo', () => {
@@ -58,7 +58,7 @@ group('Mongo', () => {
     to('reset', async () => {
       await mongo.db.createCollection('a a a');
 
-      await mongo.reset();
+      await mongo.reset('test');
 
       const collections = await mongo.getCollections(true);
 

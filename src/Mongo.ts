@@ -1,4 +1,4 @@
-import * as mongodb from 'mongodb';
+import mongodb from 'mongodb';
 
 import { merge } from '@amaui/utils';
 import { Query } from '@amaui/models';
@@ -11,19 +11,10 @@ export interface IMongoOptions {
   uri?: string;
 }
 
-export interface IMongoSearchManyAdditional {
-  pre?: Array<object>;
-  prePagination?: Array<object>;
-  post?: Array<object>;
+export interface IDefaults {
+  aggregateOptions?: mongodb.AggregateOptions;
+  limitCount?: number;
 }
-
-export interface IMongoSearchOneAdditional {
-  pre?: Array<object>;
-  post?: Array<object>;
-}
-
-export const MONGO_AGGREGATE_OPTIONS = { allowDiskUse: true };
-export const MONGO_LIMIT_COUNT = 1e3;
 
 export const mongoOptionsDefault: IMongoOptions = {};
 
@@ -36,6 +27,10 @@ export class Mongo {
   public collections: Array<mongodb.CollectionInfo>;
   // For listening on mongo events
   public subscription = new AmauiSubscription();
+  public static defaults: IDefaults = {
+    aggregateOptions: { allowDiskUse: false },
+    limitCount: 1e3
+  };
 
   public get options(): IMongoOptions {
     return this.options_;
@@ -52,21 +47,6 @@ export class Mongo {
       arguments: {
         pre: ['Mongo'],
       },
-    });
-  }
-
-  public getCollections(refetch = false): Promise<Array<mongodb.CollectionInfo>> {
-    return new Promise(async resolve => {
-      try {
-        if (this.collections && !refetch) return resolve(this.collections);
-
-        this.collections = await this.db.listCollections().toArray();
-
-        return resolve(this.collections);
-      }
-      catch (error) {
-        throw error;
-      }
     });
   }
 
@@ -101,6 +81,34 @@ export class Mongo {
 
       resolve();
     });
+  }
+
+  public getCollections(refetch = false): Promise<Array<mongodb.CollectionInfo>> {
+    return new Promise(async resolve => {
+      try {
+        if (this.collections && !refetch) return resolve(this.collections);
+
+        this.collections = await this.db.listCollections().toArray();
+
+        return resolve(this.collections);
+      }
+      catch (error) {
+        throw error;
+      }
+    });
+  }
+
+  // Be very careful with this one,
+  // it drops the entire database,
+  // usually used for testing only
+  public async reset(name: string): Promise<void> {
+    if (this.db && name && this.db.databaseName === name) {
+      await this.db.dropDatabase();
+
+      this.amalog.important(`Reset`);
+
+      this.subscription.emit('reset');
+    }
   }
 
   private connect(): Promise<mongodb.Db | undefined> {
@@ -145,19 +153,6 @@ export class Mongo {
         throw new ConnectionError(error);
       }
     });
-  }
-
-  // Be very careful with this one,
-  // it drops the entire database,
-  // usually used for testing only
-  public async reset(db_name = 'test'): Promise<void> {
-    if (this.db && this.db.databaseName.includes(db_name)) {
-      await this.db.dropDatabase();
-
-      this.amalog.important(`Reset`);
-
-      this.subscription.emit('reset');
-    }
   }
 
 }
