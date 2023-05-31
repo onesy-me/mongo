@@ -534,9 +534,22 @@ group('BaseCollection', () => {
 
       const response = await aCollection.bulkWrite(
         [
-          { insertOne: { document: { _id: id, a: 114 } } },
-          { updateOne: { filter: { _id: newObject._id }, update: { 'data.a.a': 1114 } } },
-          { deleteOne: { filter: { _id: 'ai1' } } }
+          {
+            insertOne: {
+              document: { _id: id, a: 114 }
+            }
+          },
+          {
+            updateOne: {
+              filter: { _id: newObject._id },
+              update: { 'data.a.a': 1114 }
+            }
+          },
+          {
+            deleteOne: {
+              filter: { _id: 'ai1' }
+            }
+          }
         ]
       );
 

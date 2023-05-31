@@ -13,6 +13,11 @@ import AmauiLog from '@amaui/log';
 import Mongo from './Mongo';
 import AmauiMongo from './AmauiMongo';
 
+export interface IUpdateOrAddOptions extends mongodb.FindOneAndUpdateOptions {
+  add_date?: boolean;
+  update_date?: boolean;
+}
+
 export interface IUpdateOptions extends mongodb.FindOneAndUpdateOptions {
   update_date?: boolean;
 }
@@ -48,14 +53,6 @@ export class BaseCollection {
     });
   }
 
-  public get db(): Promise<mongodb.Db> {
-    return new Promise((async resolve => {
-      if (!this.db_) this.db_ = await this.mongo.connection as mongodb.Db;
-
-      return resolve(this.db_);
-    }));
-  }
-
   public get sort(): Record<string, number> {
     return {
       [this.sortProperty]: this.sortAscending
@@ -78,6 +75,14 @@ export class BaseCollection {
       data: 1,
       api_meta: 1
     };
+  }
+
+  public get db(): Promise<mongodb.Db> {
+    return new Promise((async resolve => {
+      if (!this.db_) this.db_ = await this.mongo.connection as mongodb.Db;
+
+      return resolve(this.db_);
+    }));
   }
 
   public async collection(
@@ -563,7 +568,7 @@ export class BaseCollection {
   public async updateOneOrAdd(
     query: Query,
     value: any,
-    options_: IUpdateOptions = {}
+    options_: IUpdateOrAddOptions = {}
   ): Promise<mongodb.ModifyResult<mongodb.Document>> {
     const options = { add_date: true, update_date: true, ...options_ };
 
@@ -631,7 +636,7 @@ export class BaseCollection {
         }
       );
 
-      return this.response(start, collection, 'addMany', values.map((value, index) => ({ _id: response.insertedIds[index], ...value })));
+      return this.response(start, collection, 'addMany', response);
     }
     catch (error) {
       this.response(start, collection, 'addMany');
@@ -667,7 +672,7 @@ export class BaseCollection {
         },
       );
 
-      return this.response(start, collection, 'updateMany', response.modifiedCount);
+      return this.response(start, collection, 'updateMany', response);
     }
     catch (error) {
       this.response(start, collection, 'updateMany');
@@ -692,7 +697,7 @@ export class BaseCollection {
         }
       );
 
-      return this.response(start, collection, 'removeMany', response.deletedCount);
+      return this.response(start, collection, 'removeMany', response);
     }
     catch (error) {
       this.response(start, collection, 'removeMany');
@@ -721,7 +726,7 @@ export class BaseCollection {
         }
       );
 
-      return this.response(start, collection, 'bulkWrite', values.map((value, index) => ({ _id: response.insertedIds[index], ...value })));
+      return this.response(start, collection, 'bulkWrite', response);
     }
     catch (error) {
       this.response(start, collection, 'bulkWrite');
