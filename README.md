@@ -41,6 +41,12 @@
   yarn add @amaui/mongo
 ```
 
+Add `mongodb` as a peer dependency
+
+```sh
+  yarn add mongodb
+```
+
 ### Use
 
 ```javascript
