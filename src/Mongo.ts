@@ -1,4 +1,4 @@
-import mongodb from 'mongodb';
+import * as mongodb from 'mongodb';
 
 import { merge } from '@amaui/utils';
 import { Query } from '@amaui/models';

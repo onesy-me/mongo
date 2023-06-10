@@ -1,6 +1,6 @@
 {
   "name": "@amaui/mongo",
-  "version": "1.1.111",
+  "version": "1.1.1111",
   "description": "Utils for easier using of mongodb library.",
   "repository": "https://github.com/amaui-org/amaui-mongo.git",
   "author": "Lazar <lazareric2@gmail.com>",
