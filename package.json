@@ -25,15 +25,16 @@
     "utils"
   ],
   "scripts": {
-    "docker": "docker-compose -p 'amaui' up -d",
-    "make-replicaset": "docker compose -p 'amaui' exec mongo1 mongo localhost:27017 /utils/js/mongo/replica-set.js && docker compose -p 'amaui' exec mongo1-test mongo localhost:47017 /utils/js/mongo/replica-set.test.js",
     "prebuild": "rimraf build",
     "build": "node utils/js/build.js",
     "release": "yarn test && yarn build && npm publish ./build",
     "lint": "tslint -c tslint.json -p tsconfig.json",
     "type": "tsc --noEmit -p tsconfig.json",
     "cov": "cross-env NODE_ENV=test amaui-test",
-    "test": "yarn lint && yarn type && yarn build && yarn cov"
+    "test": "yarn lint && yarn type && yarn build && yarn cov",
+    "docker": "docker-compose -p 'amaui' up -d",
+    "mongo": "docker compose -p 'amaui' exec mongo1 mongo localhost:27017 /utils/js/mongo/replica-set.js && docker compose -p 'amaui' exec mongo1-test mongo localhost:47017 /utils/js/mongo/replica-set.test.js",
+    "postdocker": "yarn mongo"
   },
   "peerDependencies": {
     "@amaui/models": "^1.1.11111",

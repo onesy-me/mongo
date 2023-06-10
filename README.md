@@ -100,6 +100,18 @@
 
 ### Dev
 
+Install
+
+```sh
+  yarn
+```
+
+Test
+
+```sh
+  yarn test
+```
+
 #### One time local setup
 
 Install docker and docker-compose
@@ -113,12 +125,6 @@ Make docker containers
   yarn docker
 ```
 
-Make mongoDB replica set
-
-```sh
-  yarn make-replicaset
-```
-
 (mac) Add lines below to */private/etc/hosts*
 ```
 127.0.0.1   mongo1
@@ -127,18 +133,6 @@ Make mongoDB replica set
 127.0.0.1   mongo1-test
 127.0.0.1   mongo2-test
 127.0.0.1   mongo3-test
-```
-
-Install
-
-```sh
-  yarn
-```
-
-Test
-
-```sh
-  yarn test
 ```
 
 ### Prod
