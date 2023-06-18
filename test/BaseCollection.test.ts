@@ -65,10 +65,8 @@ group('BaseCollection', () => {
               i: index,
             },
           },
-          api_meta: {
-            // Milliseconds for purposes of testing only
-            added_at: new AmauiDate().utc.milliseconds,
-          },
+          // Milliseconds for purposes of testing only
+          added_at: new AmauiDate().utc.milliseconds
         });
       }
 
@@ -83,10 +81,8 @@ group('BaseCollection', () => {
               i: index,
             },
           },
-          api_meta: {
-            // Milliseconds for purposes of testing only
-            added_at: new AmauiDate().utc.milliseconds,
-          },
+          // Milliseconds for purposes of testing only
+          added_at: new AmauiDate().utc.milliseconds
         });
       }
 
@@ -100,17 +96,11 @@ group('BaseCollection', () => {
       assert(db.collection).exist;
     });
 
-    to('sort', () => assert(aCollection.sort).eq('api_meta.added_at'));
+    to('sort', () => assert(aCollection.sort).eq('added_at'));
 
     to('sortAscending', () => assert(aCollection.sortAscending).eq(-1));
 
-    to('projection', () => assert(aCollection.projection).eql({
-      _id: 1,
-      meta: '$$ROOT.meta',
-      data: '$$ROOT.data',
-      namespace: '$$ROOT.namespace',
-      api_meta: '$$ROOT.api_meta',
-    }));
+    to('projection', () => assert(aCollection.projection).eql(undefined));
 
     to('collection', async () => {
       const collection = await aCollection.collection();
@@ -157,7 +147,7 @@ group('BaseCollection', () => {
       query.limit = 4;
       query.skip = 3;
       query.total = true;
-      query.sort = { 'api_meta.added_at': 1 };
+      query.sort = { 'added_at': 1 };
 
       const response = await aCollection.find(query);
 
@@ -180,7 +170,7 @@ group('BaseCollection', () => {
             a: [
               { $match: { $and: [{ 'data.a.a': 4 }] } },
 
-              { $sort: { 'api_meta.added_at': 1 } },
+              { $sort: { 'added_at': 1 } },
 
               { $skip: 3 },
 
@@ -212,7 +202,7 @@ group('BaseCollection', () => {
           limit: 2,
           skip: 1,
           total: true,
-          sort: { 'api_meta.added_at': 1 },
+          sort: { 'added_at': 1 },
         });
 
         const response = await aCollection.searchMany(query);
@@ -236,7 +226,7 @@ group('BaseCollection', () => {
             api: { a: [{ 'data.a.i': { $gte: 3 } }] },
           },
           total: true,
-          sort: { 'api_meta.added_at': 1 },
+          sort: { 'added_at': 1 },
         });
 
         const response = await aCollection.searchMany(query, {
@@ -267,7 +257,7 @@ group('BaseCollection', () => {
             },
             skip: 1,
             limit: 4,
-            sort: { 'api_meta.added_at': 1 },
+            sort: { 'added_at': 1 },
           });
 
           response = await aCollection.searchMany(query);
@@ -304,7 +294,7 @@ group('BaseCollection', () => {
             },
             skip: 4,
             limit: 4,
-            sort: { 'api_meta.added_at': 1 },
+            sort: { 'added_at': 1 },
           }));
 
           assert(response.response.length).eq(3);
@@ -329,7 +319,7 @@ group('BaseCollection', () => {
             },
             skip: 4,
             limit: 4,
-            sort: { 'api_meta.added_at': 1 },
+            sort: { 'added_at': 1 },
           });
 
           response = await aCollection.searchMany(query);
@@ -367,7 +357,7 @@ group('BaseCollection', () => {
             },
             skip: 0,
             limit: 4,
-            sort: { 'api_meta.added_at': 1 },
+            sort: { 'added_at': 1 },
           }));
 
           assert(response.response.length).eq(4);
