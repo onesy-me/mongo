@@ -60,23 +60,15 @@ export class BaseCollection {
     };
   }
 
-  public get sortProperty(): string { return 'api_meta.added_at'; }
+  public get sortProperty(): string { return 'added_at'; }
 
   public get sortAscending(): number { return -1; }
 
-  public get addedProperty(): string { return 'api_meta.added_at'; }
+  public get addedProperty(): string { return 'added_at'; }
 
-  public get updatedProperty(): string { return 'api_meta.updated_at'; }
+  public get updatedProperty(): string { return 'updated_at'; }
 
-  public get projection(): object {
-
-    return {
-      _id: 1,
-      meta: 1,
-      data: 1,
-      api_meta: 1
-    };
-  }
+  public get projection(): object { return; }
 
   public get db(): Promise<mongodb.Db> {
     return new Promise((async resolve => {
@@ -217,7 +209,11 @@ export class BaseCollection {
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      if (!options.projection) options.projection = query.projection || this.projection;
+      if (!options.projection) {
+        options.projection = query.projection || this.projection;
+
+        if (!options.projection) delete options.projection;
+      }
       if (!options.sort) options.sort = (query.sort || this.sort as mongodb.Sort);
       if (!options.skip) options.skip = query.skip || 0;
       if (!options.limit) options.limit = query.limit || 15;
@@ -256,7 +252,11 @@ export class BaseCollection {
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      if (!options.projection) options.projection = query.projection || this.projection;
+      if (!options.projection) {
+        options.projection = query.projection || this.projection;
+
+        if (!options.projection) delete options.projection;
+      }
 
       const response = collection.findOne(
         query?.queries.find[this.collectionName] || {},
@@ -494,7 +494,7 @@ export class BaseCollection {
     try {
       if (!value) throw new AmauiMongoError(`No value provided`);
 
-      if (options.add_date) setObjectValue(value, this.addedProperty || 'api_meta.added_at', AmauiDate.utc.unix);
+      if (options.add_date) setObjectValue(value, this.addedProperty || 'added_at', AmauiDate.utc.unix);
 
       const response = await collection.insertOne(value, options);
 
@@ -521,7 +521,7 @@ export class BaseCollection {
     try {
       if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      if (is('object', value) && options.update_date) value[this.updatedProperty || 'api_meta.updated_at'] = AmauiDate.utc.unix;
+      if (is('object', value) && options.update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
 
       const response = await collection.findOneAndUpdate(
         query.queries.find[this.collectionName],
@@ -579,12 +579,12 @@ export class BaseCollection {
     try {
       if (!is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      if (options.update_date) value[this.updatedProperty || 'api_meta.updated_at'] = AmauiDate.utc.unix;
+      if (options.update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
 
       let setOnInsert: any;
 
       if (options.add_date) setOnInsert = {
-        [this.addedProperty || 'api_meta.added_at']: AmauiDate.utc.unix
+        [this.addedProperty || 'added_at']: AmauiDate.utc.unix
       };
 
       const response = await collection.findOneAndUpdate(
@@ -624,7 +624,7 @@ export class BaseCollection {
       if (!values?.length) throw new AmauiMongoError(`Values have to be a non empty array`);
 
       if (options.add_date) values = values.map(item => {
-        setObjectValue(item, this.addedProperty || 'api_meta.added_at', AmauiDate.utc.unix);
+        setObjectValue(item, this.addedProperty || 'added_at', AmauiDate.utc.unix);
 
         return item;
       });
@@ -660,7 +660,7 @@ export class BaseCollection {
     try {
       if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      if (is('object', value) && options.update_date) value[this.updatedProperty || 'api_meta.updated_at'] = AmauiDate.utc.unix;
+      if (is('object', value) && options.update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
 
       const response = await collection.updateMany(
         query.queries.find[this.collectionName],
