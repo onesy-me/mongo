@@ -42,7 +42,7 @@ export class BaseCollection {
   public constructor(
     protected collectionName: string,
     public mongo: Mongo,
-    public Model: IClass
+    public Model?: IClass
   ) {
     if (!(mongo && mongo instanceof Mongo)) throw new AmauiMongoError(`Mongo instance is required`);
     if (!collectionName) throw new AmauiMongoError(`Collection name is required`);
