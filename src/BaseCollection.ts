@@ -4,7 +4,7 @@ import express from 'express';
 import is from '@amaui/utils/is';
 import wait from '@amaui/utils/wait';
 import setObjectValue from '@amaui/utils/setObjectValue';
-import { TMethod, Query, IMongoResponse, getMongoMatch, IMongoSearchManyAdditional, IMongoSearchOneAdditional, MongoResponse, } from '@amaui/models';
+import { TMethod, Query, IMongoResponse, getMongoMatch, IMongoSearchManyAdditional, IMongoSearchOneAdditional, MongoResponse, IClass, } from '@amaui/models';
 import { AmauiMongoError, DeveloperError } from '@amaui/errors';
 import AmauiDate from '@amaui/date/amaui-date';
 import duration from '@amaui/date/duration';
@@ -41,7 +41,8 @@ export class BaseCollection {
 
   public constructor(
     protected collectionName: string,
-    public mongo: Mongo
+    public mongo: Mongo,
+    public Model: IClass
   ) {
     if (!(mongo && mongo instanceof Mongo)) throw new AmauiMongoError(`Mongo instance is required`);
     if (!collectionName) throw new AmauiMongoError(`Collection name is required`);
@@ -735,6 +736,12 @@ export class BaseCollection {
     }
   }
 
+  protected toModel(value: any) {
+    if (!this.Model) return value;
+
+    return is('array', value) ? value.map(item => new this.Model(item)) : new this.Model(value);
+  }
+
   protected response(
     start: number,
     collection: mongodb.Collection,
@@ -752,6 +759,28 @@ export class BaseCollection {
       arguments_.push(`Duration: ${duration(AmauiDate.utc.milliseconds - start, true)}`);
 
       this.amalog.debug(...arguments_);
+    }
+
+    if (this.Model !== undefined) {
+      switch (method) {
+        case 'find':
+        case 'searchMany':
+          (value as MongoResponse).response = this.toModel((value as MongoResponse).response);
+
+          break;
+
+        case 'findOne':
+        case 'aggregate':
+        case 'searchOne':
+        case 'addOne':
+        case 'updateOne':
+        case 'removeOne':
+        case 'updateOneOrAdd':
+          return this.toModel(value);
+
+        default:
+          break;
+      }
     }
 
     return value;
