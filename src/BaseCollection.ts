@@ -163,7 +163,11 @@ export class BaseCollection {
 
     try {
       const response = await collection.countDocuments(
-        query?.queries.find[this.collectionName] || {},
+        {
+          ...query.query,
+
+          ...query?.queries.find[this.collectionName]
+        },
         options
       );
 
@@ -185,7 +189,11 @@ export class BaseCollection {
 
     try {
       const response = await collection.findOne(
-        query?.queries?.find[this.collectionName] || {},
+        {
+          ...query.query,
+
+          ...query?.queries.find[this.collectionName]
+        },
         {
           projection: { _id: 1 },
           ...options
@@ -219,7 +227,11 @@ export class BaseCollection {
       if (!options.limit) options.limit = query.limit || 15;
 
       const response_ = await collection.find(
-        query.queries.find[this.collectionName],
+        {
+          ...query.query,
+
+          ...query?.queries.find[this.collectionName]
+        },
         options
       ).toArray();
 
@@ -231,7 +243,11 @@ export class BaseCollection {
       response.limit = options.limit;
 
       if (query.total) response['total'] = await collection.find(
-        query.queries.find[this.collectionName],
+        {
+          ...query.query,
+
+          ...query?.queries.find[this.collectionName]
+        },
         { projection: { _id: 1 } }
       ).count();
 
@@ -258,8 +274,12 @@ export class BaseCollection {
         if (!options.projection) delete options.projection;
       }
 
-      const response = collection.findOne(
-        query?.queries.find[this.collectionName] || {},
+      const response = await collection.findOne(
+        {
+          ...query.query,
+
+          ...query?.queries.find[this.collectionName]
+        },
         options
       );
 
@@ -280,10 +300,12 @@ export class BaseCollection {
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      const value = query?.queries?.aggregate?.[this.collectionName] || [];
-
       const response = collection.aggregate(
-        value,
+        [
+          ...(query.query || []),
+
+          ...(query?.queries?.aggregate?.[this.collectionName] || [])
+        ],
         {
           ...Mongo.defaults.aggregateOptions,
           ...options
@@ -325,6 +347,8 @@ export class BaseCollection {
       };
 
       const queryMongo = [
+        ...(query.query || []),
+
         ...pre,
 
         ...queries.aggregate,
@@ -441,6 +465,8 @@ export class BaseCollection {
       };
 
       const queryMongo = [
+        ...(query.query || []),
+
         ...pre,
 
         ...queries.aggregate,
@@ -524,7 +550,11 @@ export class BaseCollection {
       if (is('object', value) && options.update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
 
       const response = await collection.findOneAndUpdate(
-        query.queries.find[this.collectionName],
+        {
+          ...query.query,
+
+          ...query.queries.find[this.collectionName]
+        },
         {
           ...(value ? { $set: value } : {}),
           ...operators,
@@ -553,7 +583,11 @@ export class BaseCollection {
 
     try {
       const response = await collection.findOneAndDelete(
-        query.queries.find[this.collectionName],
+        {
+          ...query.query,
+
+          ...query.queries.find[this.collectionName]
+        },
         options
       );
 
@@ -588,7 +622,11 @@ export class BaseCollection {
       };
 
       const response = await collection.findOneAndUpdate(
-        query.queries.find[this.collectionName],
+        {
+          ...query.query,
+
+          ...query.queries.find[this.collectionName]
+        },
         {
           $set: value,
           ...(setOnInsert && { $setOnInsert: setOnInsert })
@@ -663,7 +701,11 @@ export class BaseCollection {
       if (is('object', value) && options.update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
 
       const response = await collection.updateMany(
-        query.queries.find[this.collectionName],
+        {
+          ...query.query,
+
+          ...query.queries.find[this.collectionName]
+        },
         {
           ...(value ? { $set: value } : {}),
           ...operators,
@@ -691,7 +733,11 @@ export class BaseCollection {
 
     try {
       const response = await collection.deleteMany(
-        query.queries.find[this.collectionName],
+        {
+          ...query.query,
+
+          ...query.queries.find[this.collectionName]
+        },
         {
           ordered: false,
           ...options
