@@ -62,7 +62,7 @@ export type TDefaults = {
   [p in TDefaultProperties | TMethods]: any;
 }
 
-export class BaseCollection {
+export class BaseCollection<IModel = any> {
   private db_: mongodb.Db;
   protected collections: Record<string, mongodb.Collection> = {};
   protected amalog: AmauiLog;
@@ -315,7 +315,7 @@ export class BaseCollection {
   public async findOne(
     query: any,
     options: mongodb.FindOptions = {}
-  ): Promise<any> {
+  ): Promise<IModel> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
@@ -350,7 +350,7 @@ export class BaseCollection {
   public async aggregate(
     query: any = new Query(),
     options: mongodb.AggregateOptions = {}
-  ): Promise<Array<mongodb.Document>> {
+  ): Promise<Array<IModel>> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
@@ -532,7 +532,7 @@ export class BaseCollection {
     query: any,
     additional: IMongoSearchOneAdditional = { pre: [], post: [] },
     options: ISearchOne = {}
-  ): Promise<mongodb.Document> {
+  ): Promise<IModel> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
@@ -610,7 +610,7 @@ export class BaseCollection {
   public async addOne(
     value: any,
     options_: IAddOneOptions = {}
-  ): Promise<mongodb.Document> {
+  ): Promise<IModel> {
     const options = { add_date: true, ...options_ };
 
     const {
@@ -643,7 +643,7 @@ export class BaseCollection {
     value?: any,
     operators: mongodb.UpdateFilter<any> = {},
     options_: IUpdateOptions = {}
-  ): Promise<mongodb.ModifyResult<mongodb.Document>> {
+  ): Promise<IModel> {
     const options = { update_date: true, ...options_ };
 
     const {
@@ -723,7 +723,7 @@ export class BaseCollection {
     query: any,
     value: any,
     options_: IUpdateOrAddOptions = {}
-  ): Promise<mongodb.ModifyResult<mongodb.Document>> {
+  ): Promise<IModel> {
     const options = { add_date: true, update_date: true, ...options_ };
 
     const {
@@ -859,7 +859,7 @@ export class BaseCollection {
         },
         {
           ...optionsMongo
-        },
+        }
       );
 
       return this.response(start, collection, 'updateMany', response);
