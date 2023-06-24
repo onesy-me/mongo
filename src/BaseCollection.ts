@@ -34,15 +34,46 @@ export interface IAddManyOptions extends mongodb.BulkWriteOptions {
   add_date?: boolean;
 }
 
+export interface IFindOptions extends mongodb.FindOptions {
+  total?: boolean;
+  sort?: any;
+  projection?: any;
+}
+
+export interface ISearchOne extends mongodb.AggregateOptions {
+  projection?: any;
+}
+
+export interface ISearchManyOptions extends mongodb.AggregateOptions {
+  total?: boolean;
+  limit?: number;
+  skip?: number;
+  sort?: any;
+  next?: any;
+  previous?: any;
+  projection?: any;
+}
+
+export type TMethods = 'count' | 'exists' | 'find' | 'findOne' | 'aggregate' | 'searchMany' | 'searchOne' | 'addOne' | 'updateOne' | 'removeOne' | 'updateOneOrAdd' | 'addMany' | 'updateMany' | 'removeMany' | 'bulkWrite';
+
+export type TDefaultProperties = 'query' | 'queryObject' | 'queryArray';
+
+export type TDefaults = {
+  [p in TDefaultProperties | TMethods]: any;
+}
+
 export class BaseCollection {
   private db_: mongodb.Db;
   protected collections: Record<string, mongodb.Collection> = {};
   protected amalog: AmauiLog;
 
+  public static defaults: TDefaults;
+
   public constructor(
     protected collectionName: string,
     public mongo: Mongo,
-    public Model?: IClass
+    public Model?: IClass,
+    public defaults?: TDefaults
   ) {
     if (!(mongo && mongo instanceof Mongo)) throw new AmauiMongoError(`Mongo instance is required`);
     if (!collectionName) throw new AmauiMongoError(`Collection name is required`);
@@ -155,18 +186,21 @@ export class BaseCollection {
   }
 
   public async count(
-    query: Query = new Query(),
+    query: any = new Query(),
     options: mongodb.CountDocumentsOptions = {}
   ): Promise<number> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
+      const defaults = this.getDefaults('count') as any;
+
       const response = await collection.countDocuments(
         {
-          ...query.query,
+          // defaults
+          ...defaults,
 
-          ...query?.queries.find[this.collectionName]
+          ...this.query(query)
         },
         options
       );
@@ -181,21 +215,25 @@ export class BaseCollection {
   }
 
   public async exists(
-    query: Query,
+    query: any,
     options: mongodb.FindOptions = {}
   ): Promise<boolean> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
+      const defaults = this.getDefaults('exists') as any;
+
       const response = await collection.findOne(
         {
-          ...query.query,
+          // defaults
+          ...defaults,
 
-          ...query?.queries.find[this.collectionName]
+          ...this.query(query)
         },
         {
           projection: { _id: 1 },
+
           ...options
         }
       );
@@ -210,46 +248,60 @@ export class BaseCollection {
   }
 
   public async find(
-    query: Query,
-    options: mongodb.FindOptions = {}
+    query: any,
+    options: IFindOptions = {}
   ): Promise<IMongoResponse> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      if (!options.projection) {
-        options.projection = query.projection || this.projection;
+      const {
+        total,
+        sort,
+        limit,
+        skip,
 
-        if (!options.projection) delete options.projection;
+        ...optionsOther
+      } = options;
+
+      const defaults = this.getDefaults('find') as any;
+
+      const optionsMongo: any = { ...optionsOther };
+
+      if (!optionsMongo.projection) {
+        optionsMongo.projection = (BaseCollection.isAmauiQuery(query) && query.projection) || this.projection;
+
+        if (!optionsMongo.projection) delete optionsMongo.projection;
       }
-      if (!options.sort) options.sort = (query.sort || this.sort as mongodb.Sort);
-      if (!options.skip) options.skip = query.skip || 0;
-      if (!options.limit) options.limit = query.limit || 15;
+      optionsMongo.sort = ((BaseCollection.isAmauiQuery(query) ? query.sort : sort) || this.sort as mongodb.Sort);
+      optionsMongo.skip = (BaseCollection.isAmauiQuery(query) ? query.skip : skip) || 0;
+      optionsMongo.limit = (BaseCollection.isAmauiQuery(query) ? query.limit : limit) || 15;
+
+      const queryMongo = {
+        // defaults
+        ...defaults,
+
+        ...this.query(query)
+      };
 
       const response_ = await collection.find(
-        {
-          ...query.query,
-
-          ...query?.queries.find[this.collectionName]
-        },
-        options
+        queryMongo,
+        optionsMongo
       ).toArray();
 
       const response = new MongoResponse(response_);
 
-      response.sort = options.sort as any;
+      response.sort = optionsMongo.sort as any;
       response.size = response_.length;
-      response.skip = options.skip;
-      response.limit = options.limit;
+      response.skip = optionsMongo.skip;
+      response.limit = optionsMongo.limit;
 
-      if (query.total) response['total'] = await collection.find(
-        {
-          ...query.query,
-
-          ...query?.queries.find[this.collectionName]
-        },
-        { projection: { _id: 1 } }
-      ).count();
+      if (BaseCollection.isAmauiQuery(query) ? query.total : total) {
+        response['total'] = await collection.find(
+          queryMongo,
+          { projection: { _id: 1 } }
+        ).count();
+      }
 
       return this.response(start, collection, 'find', response);
     }
@@ -261,24 +313,27 @@ export class BaseCollection {
   }
 
   public async findOne(
-    query: Query,
+    query: any,
     options: mongodb.FindOptions = {}
   ): Promise<any> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
+      const defaults = this.getDefaults('findOne') as any;
+
       if (!options.projection) {
-        options.projection = query.projection || this.projection;
+        options.projection = (BaseCollection.isAmauiQuery(query) && query.projection) || this.projection;
 
         if (!options.projection) delete options.projection;
       }
 
       const response = await collection.findOne(
         {
-          ...query.query,
+          // defaults
+          ...defaults,
 
-          ...query?.queries.find[this.collectionName]
+          ...this.query(query)
         },
         options
       );
@@ -293,18 +348,21 @@ export class BaseCollection {
   }
 
   public async aggregate(
-    query: Query = new Query(),
+    query: any = new Query(),
     options: mongodb.AggregateOptions = {}
   ): Promise<Array<mongodb.Document>> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
+      const defaults = this.getDefaults('aggregate') as any;
+
       const response = collection.aggregate(
         [
-          ...(query.query || []),
+          // defaults
+          ...(defaults || []),
 
-          ...(query?.queries?.aggregate?.[this.collectionName] || [])
+          ...this.query(query)
         ],
         {
           ...Mongo.defaults.aggregateOptions,
@@ -322,17 +380,36 @@ export class BaseCollection {
   }
 
   public async searchMany(
-    query: Query,
+    query: any,
     additional: IMongoSearchManyAdditional = { pre: [], prePagination: [], post: [] },
-    options: mongodb.AggregateOptions = {}
+    options: ISearchManyOptions = {}
   ): Promise<IMongoResponse> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      const projection = query.projection || this.projection;
-      const sort = query.sort || this.sort as mongodb.Sort;
-      const { limit, next, previous, skip } = query;
+      const {
+        total: optionsTotal,
+        sort: optionsSort,
+        limit: optionsLimit = 15,
+        skip: optionsSkip,
+        projection: optionsProjection,
+
+        ...optionsOther
+      } = options;
+
+      const defaults = this.getDefaults('searchMany') as any;
+
+      const optionsMongo = { ...optionsOther };
+
+      const projection = (BaseCollection.isAmauiQuery(query) ? query.projection : optionsProjection) || this.projection;
+      const sort = (BaseCollection.isAmauiQuery(query) ? query.sort : optionsSort) || this.sort as mongodb.Sort;
+      const {
+        limit = optionsLimit,
+        skip = optionsSkip,
+        next,
+        previous
+      } = BaseCollection.isAmauiQuery(query) ? query : options;
       const hasPaginator = next || previous;
 
       const pre = additional.pre || [];
@@ -340,14 +417,17 @@ export class BaseCollection {
       const post = additional.post || [];
 
       const queries = {
-        search: query.queries.search[this.collectionName],
-        api: query.queries.api[this.collectionName],
-        permissions: query.queries.permissions[this.collectionName],
-        aggregate: query.queries.aggregate[this.collectionName] || [],
+        search: (BaseCollection.isAmauiQuery(query) ? query.queries.search[this.collectionName] : []) || [],
+        api: (BaseCollection.isAmauiQuery(query) ? query.queries.api[this.collectionName] : []) || [],
+        permissions: (BaseCollection.isAmauiQuery(query) ? query.queries.permissions[this.collectionName] : []) || [],
+        aggregate: (BaseCollection.isAmauiQuery(query) ? query.queries.aggregate[this.collectionName] : []) || []
       };
 
       const queryMongo = [
-        ...(query.query || []),
+        // defaults
+        ...(defaults || []),
+
+        ...((BaseCollection.isAmauiQuery(query) ? query.query : query) || []),
 
         ...pre,
 
@@ -377,7 +457,7 @@ export class BaseCollection {
         ...(sort ? [{ $sort: sort }] : [{}]),
 
         // Either skip or a paginator
-        ...((query.skip !== undefined && !hasPaginator) ? [{ $skip: skip }] : []),
+        ...((query?.skip !== undefined && !hasPaginator) ? [{ $skip: skip }] : []),
 
         // +1 so we know if there's a next page
         { $limit: limit + 1 },
@@ -387,7 +467,13 @@ export class BaseCollection {
         ...post,
       ];
 
-      const response_ = await collection.aggregate(pipeline, { ...Mongo.defaults.aggregateOptions, ...options }).toArray();
+      const response_ = await collection.aggregate(
+        pipeline,
+        {
+          ...Mongo.defaults.aggregateOptions,
+          ...optionsMongo
+        }
+      ).toArray();
 
       // Add results and limit
       const objects = response_.slice(0, limit);
@@ -412,7 +498,7 @@ export class BaseCollection {
       // Count total only if it's requested by the query
       let total: number;
 
-      if (query.total) {
+      if (BaseCollection.isAmauiQuery(query) ? query.total : optionsTotal) {
         const total_ = await collection.aggregate(
           [
             ...queryMongo,
@@ -424,7 +510,7 @@ export class BaseCollection {
           ],
           {
             ...Mongo.defaults.aggregateOptions,
-            ...options
+            ...optionsMongo
           }
         ).toArray();
 
@@ -443,29 +529,42 @@ export class BaseCollection {
   }
 
   public async searchOne(
-    query: Query,
+    query: any,
     additional: IMongoSearchOneAdditional = { pre: [], post: [] },
-    options: mongodb.AggregateOptions = {}
+    options: ISearchOne = {}
   ): Promise<mongodb.Document> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      const projection = query.projection || this.projection;
+      const {
+        projection: optionsProjection,
+
+        ...optionsOther
+      } = options;
+
+      const defaults = this.getDefaults('searchOne') as any;
+
+      const optionsMongo = { ...optionsOther };
+
       const limit = 1;
+      const projection = (BaseCollection.isAmauiQuery(query) ? query.projection : optionsProjection) || this.projection;
 
       const pre = additional.pre || [];
       const post = additional.post || [];
 
       const queries = {
-        search: query.queries.search[this.collectionName],
-        api: query.queries.api[this.collectionName],
-        permissions: query.queries.permissions[this.collectionName],
-        aggregate: query.queries.aggregate[this.collectionName] || [],
+        search: (BaseCollection.isAmauiQuery(query) ? query.queries.search[this.collectionName] : []) || [],
+        api: (BaseCollection.isAmauiQuery(query) ? query.queries.api[this.collectionName] : []) || [],
+        permissions: (BaseCollection.isAmauiQuery(query) ? query.queries.permissions[this.collectionName] : []) || [],
+        aggregate: (BaseCollection.isAmauiQuery(query) ? query.queries.aggregate[this.collectionName] : []) || []
       };
 
       const queryMongo = [
-        ...(query.query || []),
+        // defaults
+        ...(defaults || []),
+
+        ...((BaseCollection.isAmauiQuery(query) ? query.query : query) || []),
 
         ...pre,
 
@@ -495,7 +594,7 @@ export class BaseCollection {
         pipeline,
         {
           ...Mongo.defaults.aggregateOptions,
-          ...options
+          ...optionsMongo
         }
       ).toArray();
 
@@ -514,15 +613,21 @@ export class BaseCollection {
   ): Promise<mongodb.Document> {
     const options = { add_date: true, ...options_ };
 
+    const {
+      add_date,
+
+      ...optionsMongo
+    } = options;
+
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
       if (!value) throw new AmauiMongoError(`No value provided`);
 
-      if (options.add_date) setObjectValue(value, this.addedProperty || 'added_at', AmauiDate.utc.unix);
+      if (add_date) setObjectValue(value, this.addedProperty || 'added_at', AmauiDate.utc.unix);
 
-      const response = await collection.insertOne(value, options);
+      const response = await collection.insertOne(value, optionsMongo);
 
       return this.response(start, collection, 'addOne', { _id: response.insertedId, ...value });
     }
@@ -534,34 +639,45 @@ export class BaseCollection {
   }
 
   public async updateOne(
-    query: Query,
+    query: any,
     value?: any,
     operators: mongodb.UpdateFilter<any> = {},
     options_: IUpdateOptions = {}
   ): Promise<mongodb.ModifyResult<mongodb.Document>> {
     const options = { update_date: true, ...options_ };
 
+    const {
+      update_date,
+
+      ...optionsMongo
+    } = options;
+
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
+      const defaults = this.getDefaults('updateOne') as any;
+
       if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      if (is('object', value) && options.update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
+      if (is('object', value) && update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
 
       const response = await collection.findOneAndUpdate(
         {
-          ...query.query,
+          // defaults
+          ...defaults,
 
-          ...query.queries.find[this.collectionName]
+          ...this.query(query)
         },
         {
           ...(value ? { $set: value } : {}),
-          ...operators,
+
+          ...operators
         },
         {
-          ...options,
           returnDocument: 'after',
+
+          ...optionsMongo
         } as mongodb.FindOneAndUpdateOptions
       );
 
@@ -575,18 +691,21 @@ export class BaseCollection {
   }
 
   public async removeOne(
-    query: Query,
+    query: any,
     options: mongodb.FindOneAndDeleteOptions = {}
   ): Promise<mongodb.ModifyResult<mongodb.Document>> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
+      const defaults = this.getDefaults('removeOne') as any;
+
       const response = await collection.findOneAndDelete(
         {
-          ...query.query,
+          // defaults
+          ...defaults,
 
-          ...query.queries.find[this.collectionName]
+          ...this.query(query)
         },
         options
       );
@@ -601,40 +720,51 @@ export class BaseCollection {
   }
 
   public async updateOneOrAdd(
-    query: Query,
+    query: any,
     value: any,
     options_: IUpdateOrAddOptions = {}
   ): Promise<mongodb.ModifyResult<mongodb.Document>> {
     const options = { add_date: true, update_date: true, ...options_ };
 
+    const {
+      add_date,
+      update_date,
+
+      ...optionsMongo
+    } = options;
+
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
+      const defaults = this.getDefaults('updateOneOrAdd') as any;
+
       if (!is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      if (options.update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
+      if (update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
 
       let setOnInsert: any;
 
-      if (options.add_date) setOnInsert = {
+      if (add_date) setOnInsert = {
         [this.addedProperty || 'added_at']: AmauiDate.utc.unix
       };
 
       const response = await collection.findOneAndUpdate(
         {
-          ...query.query,
+          // defaults
+          ...defaults,
 
-          ...query.queries.find[this.collectionName]
+          ...this.query(query)
         },
         {
           $set: value,
           ...(setOnInsert && { $setOnInsert: setOnInsert })
         },
         {
-          ...options,
           upsert: true,
           returnDocument: 'after',
+
+          ...optionsMongo
         }
       );
 
@@ -653,6 +783,12 @@ export class BaseCollection {
   ): Promise<Array<mongodb.Document>> {
     const options = { add_date: true, ...options_ };
 
+    const {
+      add_date,
+
+      ...optionsMongo
+    } = options;
+
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
@@ -661,7 +797,7 @@ export class BaseCollection {
 
       if (!values?.length) throw new AmauiMongoError(`Values have to be a non empty array`);
 
-      if (options.add_date) values = values.map(item => {
+      if (add_date) values = values.map(item => {
         setObjectValue(item, this.addedProperty || 'added_at', AmauiDate.utc.unix);
 
         return item;
@@ -671,7 +807,8 @@ export class BaseCollection {
         values,
         {
           ordered: false,
-          ...options
+
+          ...optionsMongo
         }
       );
 
@@ -685,33 +822,43 @@ export class BaseCollection {
   }
 
   public async updateMany(
-    query: Query,
+    query: any,
     value?: any,
     operators: mongodb.UpdateFilter<any> = {},
     options_: IUpdateManyOptions = {}
   ): Promise<number> {
     const options = { update_date: true, ...options_ };
 
+    const {
+      update_date,
+
+      ...optionsMongo
+    } = options;
+
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
+      const defaults = this.getDefaults('updateMany') as any;
+
       if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      if (is('object', value) && options.update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
+      if (is('object', value) && update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
 
       const response = await collection.updateMany(
         {
-          ...query.query,
+          // defaults
+          ...defaults,
 
-          ...query.queries.find[this.collectionName]
+          ...this.query(query)
         },
         {
           ...(value ? { $set: value } : {}),
+
           ...operators,
         },
         {
-          ...options
+          ...optionsMongo
         },
       );
 
@@ -725,21 +872,25 @@ export class BaseCollection {
   }
 
   public async removeMany(
-    query: Query,
-    options: mongodb.DeleteOptions = { ordered: false }
+    query: any,
+    options: mongodb.DeleteOptions = {}
   ): Promise<number> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
     try {
+      const defaults = this.getDefaults('removeMany') as any;
+
       const response = await collection.deleteMany(
         {
-          ...query.query,
+          // defaults
+          ...defaults,
 
-          ...query.queries.find[this.collectionName]
+          ...this.query(query)
         },
         {
           ordered: false,
+
           ...options
         }
       );
@@ -769,6 +920,7 @@ export class BaseCollection {
         values,
         {
           ordered: false,
+
           ...options
         }
       );
@@ -830,6 +982,80 @@ export class BaseCollection {
     }
 
     return value;
+  }
+
+  public query(query: any, aggregate = false) {
+    if (BaseCollection.isAmauiQuery(query)) {
+      if (aggregate) {
+        return [
+          ...(query?.query || []),
+
+          ...(query?.queries?.aggregate?.[this.collectionName] || [])
+        ];
+      }
+      else {
+        return {
+          ...query?.query,
+
+          ...query?.queries?.find?.[this.collectionName]
+        };
+      }
+    }
+
+    return aggregate ? (query || []) : query;
+  }
+
+  public getDefaults(method: TMethods) {
+    let value = ['aggregate', 'searchMany', 'searchOne'].includes(method) ? [] : {};
+
+    // static
+    if (['aggregate', 'searchMany', 'searchOne'].includes(method)) {
+      // query
+      if (is('array', BaseCollection.defaults?.query)) (value as any[]).push(...BaseCollection.defaults?.query);
+
+      // queryArray
+      if (is('array', BaseCollection.defaults?.queryArray)) (value as any[]).push(...BaseCollection.defaults?.queryArray);
+
+      // method
+      if (is('array', BaseCollection.defaults?.[method])) (value as any[]).push(...BaseCollection.defaults?.[method]);
+    }
+    else {
+      // query
+      if (is('object', BaseCollection.defaults?.query)) value = { ...value, ...BaseCollection.defaults?.query };
+
+      // queryObject
+      if (is('object', BaseCollection.defaults?.queryObject)) value = { ...value, ...BaseCollection.defaults?.queryObject };
+
+      // method
+      if (is('object', BaseCollection.defaults?.[method])) value = { ...value, ...BaseCollection.defaults?.[method] };
+    }
+
+    // instance
+    if (['aggregate', 'searchMany', 'searchOne'].includes(method)) {
+      // query
+      if (is('array', this.defaults?.query)) (value as any[]).push(...this.defaults?.query);
+
+      // queryArray
+      if (is('array', this.defaults?.queryArray)) (value as any[]).push(...this.defaults?.queryArray);
+
+      // method
+      if (is('array', this.defaults?.[method])) (value as any[]).push(...this.defaults?.[method]);
+    }
+    else {
+      // query
+      if (is('object', this.defaults?.query)) value = { ...value, ...this.defaults?.query };
+
+      // queryObject
+      if (is('object', this.defaults?.queryObject)) value = { ...value, ...this.defaults?.queryObject };
+
+      // method
+      if (is('object', this.defaults?.[method])) value = { ...value, ...this.defaults?.[method] };
+    }
+
+  }
+
+  public static isAmauiQuery(value: any) {
+    return value instanceof Query || (value?.hasOwnProperty('query') && value?.hasOwnProperty('queries'));
   }
 
 }
