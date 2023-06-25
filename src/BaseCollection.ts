@@ -641,7 +641,7 @@ export class BaseCollection<IModel = any> {
   public async updateOne(
     query: any,
     value?: any,
-    operators: mongodb.UpdateFilter<any> = {},
+    operators: mongodb.UpdateFilter<unknown> = {},
     options_: IUpdateOptions = {}
   ): Promise<IModel> {
     const options = { update_date: true, ...options_ };
@@ -673,7 +673,7 @@ export class BaseCollection<IModel = any> {
           ...(value ? { $set: value } : {}),
 
           ...operators
-        },
+        } as any,
         {
           returnDocument: 'after',
 
@@ -824,7 +824,7 @@ export class BaseCollection<IModel = any> {
   public async updateMany(
     query: any,
     value?: any,
-    operators: mongodb.UpdateFilter<any> = {},
+    operators: mongodb.UpdateFilter<unknown> = {},
     options_: IUpdateManyOptions = {}
   ): Promise<number> {
     const options = { update_date: true, ...options_ };
@@ -856,7 +856,7 @@ export class BaseCollection<IModel = any> {
           ...(value ? { $set: value } : {}),
 
           ...operators,
-        },
+        } as any,
         {
           ...optionsMongo
         }
