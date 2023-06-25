@@ -608,7 +608,7 @@ export class BaseCollection<IModel = any> {
   }
 
   public async addOne(
-    value: any,
+    value_: any,
     options_: IAddOneOptions = {}
   ): Promise<IModel> {
     const options = { add_date: true, ...options_ };
@@ -623,6 +623,8 @@ export class BaseCollection<IModel = any> {
     const start = AmauiDate.utc.milliseconds;
 
     try {
+      const value = BaseCollection.value(value_);
+
       if (!value) throw new AmauiMongoError(`No value provided`);
 
       if (add_date) setObjectValue(value, this.addedProperty || 'added_at', AmauiDate.utc.unix);
@@ -793,7 +795,7 @@ export class BaseCollection<IModel = any> {
     const start = AmauiDate.utc.milliseconds;
 
     try {
-      let values = values_;
+      let values = values_.map(item => BaseCollection.value(item));
 
       if (!values?.length) throw new AmauiMongoError(`Values have to be a non empty array`);
 
@@ -1052,6 +1054,13 @@ export class BaseCollection<IModel = any> {
       if (is('object', this.defaults?.[method])) value = { ...value, ...this.defaults?.[method] };
     }
 
+  }
+
+  public static value(value: any) {
+    // Getter object method
+    if (is('function', value?.toObject)) return value.toObject();
+
+    return { ...value };
   }
 
   public static isAmauiQuery(value: any) {
