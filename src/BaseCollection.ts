@@ -31,6 +31,7 @@ export interface IAddOneOptions extends mongodb.InsertOneOptions {
 }
 
 export interface IAddManyOptions extends mongodb.BulkWriteOptions {
+  original?: boolean;
   add_date?: boolean;
 }
 
@@ -357,7 +358,7 @@ export class BaseCollection<IModel = any> {
     try {
       const defaults = this.getDefaults('aggregate') as any;
 
-      const response = collection.aggregate(
+      const response = await collection.aggregate(
         [
           // defaults
           ...(defaults || []),
@@ -805,7 +806,7 @@ export class BaseCollection<IModel = any> {
         return item;
       });
 
-      const response = await collection.insertMany(
+      let response = await collection.insertMany(
         values,
         {
           ordered: false,
@@ -813,6 +814,12 @@ export class BaseCollection<IModel = any> {
           ...optionsMongo
         }
       );
+
+      if (!options.original) {
+        const ids = Object.keys(response.insertedIds || {}).map(item => response.insertedIds?.[item]);
+
+        response = values.filter(item => !!ids.find(id => item._id.toString() === id.toString())) as any;
+      }
 
       return this.response(start, collection, 'addMany', response);
     }
