@@ -81,8 +81,8 @@ export class BaseCollection<IModel = any> {
 
     this.amalog = new AmauiLog({
       arguments: {
-        pre: ['Mongo'],
-      },
+        pre: ['Mongo']
+      }
     });
   }
 
