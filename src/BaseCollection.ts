@@ -948,7 +948,7 @@ export class BaseCollection<IModel = any> {
   }
 
   protected toModel(value: any) {
-    if (!this.Model) return value;
+    if (!this.Model || [null, undefined].includes(value)) return value;
 
     return is('array', value) ? value.map(item => new this.Model(item)) : new this.Model(value);
   }
