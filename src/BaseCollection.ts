@@ -168,7 +168,11 @@ export class BaseCollection<IModel = any> {
       const session = this.mongo.client.startSession();
 
       try {
-        response = await session.withTransaction(async () => await method(session), transactionOptions);
+        await session.withTransaction(async () => {
+          response = await method(session);
+
+          return response;
+        }, transactionOptions);
       }
       catch (error_) {
         error = error_;
