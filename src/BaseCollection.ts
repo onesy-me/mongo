@@ -13,6 +13,10 @@ import AmauiLog from '@amaui/log';
 import Mongo from './Mongo';
 import AmauiMongo from './AmauiMongo';
 
+export interface IUpdateFilters extends mongodb.UpdateFilter<unknown> {
+  [p: string]: any;
+}
+
 export interface IUpdateOrAddOptions extends mongodb.FindOneAndUpdateOptions {
   add_date?: boolean;
   update_date?: boolean;
@@ -647,8 +651,7 @@ export class BaseCollection<IModel = any> {
 
   public async updateOne(
     query: any,
-    value?: any,
-    operators: mongodb.UpdateFilter<unknown> = {},
+    value: IUpdateFilters,
     options_: IUpdateOptions = {}
   ): Promise<IModel> {
     const options = { update_date: true, ...options_ };
@@ -665,9 +668,19 @@ export class BaseCollection<IModel = any> {
     try {
       const defaults = this.getDefaults('updateOne') as any;
 
-      if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
+      if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with update values`);
 
       if (is('object', value) && update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
+
+      const update = {};
+      const operators = {};
+
+      // use both update values
+      // and operator values in the same object
+      Object.keys(value).forEach(item => {
+        if (item.startsWith('$')) operators[item] = value[item];
+        else update[item] = value[item];
+      });
 
       const response = await collection.findOneAndUpdate(
         {
@@ -677,10 +690,16 @@ export class BaseCollection<IModel = any> {
           ...this.query(query)
         },
         {
-          ...(value ? { $set: value } : {}),
+          ...operators,
 
-          ...operators
-        } as any,
+          ...((!!Object.keys(update).length || operators['$set']) && {
+            $set: {
+              ...operators['$set'],
+
+              ...update
+            }
+          })
+        },
         {
           returnDocument: 'after',
 
@@ -836,8 +855,7 @@ export class BaseCollection<IModel = any> {
 
   public async updateMany(
     query: any,
-    value?: any,
-    operators: mongodb.UpdateFilter<unknown> = {},
+    value: IUpdateFilters,
     options_: IUpdateManyOptions = {}
   ): Promise<number> {
     const options = { update_date: true, ...options_ };
@@ -858,6 +876,16 @@ export class BaseCollection<IModel = any> {
 
       if (is('object', value) && update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
 
+      const update = {};
+      const operators = {};
+
+      // use both update values
+      // and operator values in the same object
+      Object.keys(value).forEach(item => {
+        if (item.startsWith('$')) operators[item] = value[item];
+        else update[item] = value[item];
+      });
+
       const response = await collection.updateMany(
         {
           // defaults
@@ -866,10 +894,16 @@ export class BaseCollection<IModel = any> {
           ...this.query(query)
         },
         {
-          ...(value ? { $set: value } : {}),
-
           ...operators,
-        } as any,
+
+          ...((!!Object.keys(update).length || operators['$set']) && {
+            $set: {
+              ...operators['$set'],
+
+              ...update
+            }
+          })
+        },
         {
           ...optionsMongo
         }
