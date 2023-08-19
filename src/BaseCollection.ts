@@ -142,7 +142,7 @@ export class BaseCollection<IModel = any> {
     return this.collections[name];
   }
 
-  public async transaction(method: TMethod, options = { retries: 5, retriesWait: 140 }): Promise<void | Error> {
+  public async transaction(method: TMethod, options = { retries: 5, retriesWait: 140 }): Promise<any> {
     if (!is('function', method)) throw new DeveloperError('First argument has to be a function');
 
     const transactionOptions: mongodb.TransactionOptions = {
@@ -719,7 +719,7 @@ export class BaseCollection<IModel = any> {
   public async removeOne(
     query: any,
     options: mongodb.FindOneAndDeleteOptions = {}
-  ): Promise<mongodb.ModifyResult<mongodb.Document>> {
+  ): Promise<mongodb.ModifyResult<IModel>> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
 
@@ -806,7 +806,7 @@ export class BaseCollection<IModel = any> {
   public async addMany(
     values_: any[],
     options_: IAddManyOptions = {}
-  ): Promise<Array<mongodb.Document>> {
+  ): Promise<Array<IModel>> {
     const options = { add_date: true, ...options_ };
 
     const {
@@ -954,7 +954,7 @@ export class BaseCollection<IModel = any> {
   public async bulkWrite(
     values: mongodb.AnyBulkWriteOperation[] = [],
     options_: mongodb.BulkWriteOptions = {}
-  ): Promise<Array<mongodb.Document>> {
+  ): Promise<mongodb.BulkWriteResult> {
     const options = { ...options_ };
 
     const collection = await this.collection();

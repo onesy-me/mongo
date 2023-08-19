@@ -1,6 +1,6 @@
 {
   "name": "@amaui/mongo",
-  "version": "1.1.17",
+  "version": "1.1.5",
   "description": "Utils for easier using of mongodb library.",
   "repository": "https://github.com/amaui-org/amaui-mongo.git",
   "author": "Lazar <lazareric2@gmail.com>",
@@ -42,10 +42,10 @@
   "dependencies": {
     "@amaui/date": "^1.0.11434",
     "@amaui/errors": "^1.0.111",
-    "@amaui/log": "^1.0.11145",
-    "@amaui/models": "^1.1.11141",
-    "@amaui/subscription": "^1.0.11151",
-    "@amaui/utils": "^1.0.11447",
+    "@amaui/log": "^1.0.14",
+    "@amaui/models": "^1.1.13",
+    "@amaui/subscription": "^1.0.5",
+    "@amaui/utils": "^1.1.7",
     "@babel/runtime": "^7.18.3"
   },
   "devDependencies": {
