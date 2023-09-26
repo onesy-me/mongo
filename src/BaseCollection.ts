@@ -421,6 +421,8 @@ export class BaseCollection<IModel = any> {
       } = BaseCollection.isAmauiQuery(query) ? query : options;
       const hasPaginator = next || previous;
 
+      const paginatorProperty = Object.keys((next || previous || {}))[0];
+
       const pre = additional.pre || [];
       const pre_pagination = additional.prePagination || [];
       const post = additional.post || [];
@@ -463,7 +465,9 @@ export class BaseCollection<IModel = any> {
         // Previous paginator
         ...(previous ? getMongoMatch([previous as Record<string, any>]) : []),
 
-        ...(sort ? [{ $sort: sort }] : [{}]),
+        ...(hasPaginator ? [{ $sort: { [paginatorProperty]: next ? -1 : 1 } }] : []),
+
+        ...(sort && !hasPaginator ? [{ $sort: sort }] : []),
 
         // Either skip or a paginator
         ...((query?.skip !== undefined && !hasPaginator) ? [{ $skip: skip }] : []),
@@ -471,9 +475,11 @@ export class BaseCollection<IModel = any> {
         // +1 so we know if there's a next page
         { $limit: limit + 1 },
 
+        ...(sort && hasPaginator ? [{ $sort: sort }] : []),
+
         ...(projection ? [{ $project: projection }] : []),
 
-        ...post,
+        ...post
       ];
 
       const response_ = await collection.aggregate(
@@ -485,7 +491,7 @@ export class BaseCollection<IModel = any> {
       ).toArray();
 
       // Add results and limit
-      const objects = response_.slice(0, limit);
+      const objects = (!hasPaginator || next || response_.length <= limit) ? response_.slice(0, limit) : response_.slice(1, limit + 1);
       const first = objects[0];
       const last = objects[objects.length - 1];
 
@@ -496,9 +502,9 @@ export class BaseCollection<IModel = any> {
       response.limit = limit;
 
       // Add hasNext, next, previous
-      response['hasNext'] = response_.length > objects.length;
+      response['hasNext'] = previous || response_.length > objects.length;
 
-      response['hasPrevious'] = !!(objects.length && (skip > 0 || next));
+      response['hasPrevious'] = !hasPaginator ? query.skip > 0 : next || (response_.length > objects.length);
 
       if (last) response['next'] = AmauiMongo.createPaginator(last, [this.sortProperty], sort);
 
