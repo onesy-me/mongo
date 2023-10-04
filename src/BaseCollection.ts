@@ -790,10 +790,12 @@ export class BaseCollection<IModel = any> {
         },
         {
           $set: value,
+
           ...(setOnInsert && { $setOnInsert: setOnInsert })
         },
         {
           upsert: true,
+
           returnDocument: 'after',
 
           ...optionsMongo
