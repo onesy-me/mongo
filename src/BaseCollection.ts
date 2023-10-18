@@ -6,7 +6,7 @@ import wait from '@amaui/utils/wait';
 import setObjectValue from '@amaui/utils/setObjectValue';
 import { TMethod, Query, IMongoResponse, getMongoMatch, IMongoSearchManyAdditional, IMongoSearchOneAdditional, MongoResponse, IClass, } from '@amaui/models';
 import { AmauiMongoError, DeveloperError } from '@amaui/errors';
-import AmauiDate from '@amaui/date/amaui-date';
+import AmauiDate from '@amaui/date/AmauiDate';
 import duration from '@amaui/date/duration';
 import AmauiLog from '@amaui/log';
 
