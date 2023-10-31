@@ -26,6 +26,7 @@ export type IMongoSearchManyAdditionalLookup = {
 export type IMongoSearchManyAdditionalOption = {
   name: string;
   property: string;
+  version?: 'array' | 'object' | 'string' | 'objectID';
   lookup?: IMongoSearchManyAdditionalLookup;
 }
 
@@ -539,6 +540,10 @@ export class BaseCollection<IModel = any> {
         const optionsResponse = await collection.aggregate(
           [
             ...queryMongo,
+
+            ...additional.options.map(item => ['array', undefined].includes(item.version) ? ({
+              $unwind: `$${item.property}`
+            }) : undefined).filter(Boolean),
 
             ...additional.options.map(item => ({
               $group: {
