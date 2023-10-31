@@ -3,8 +3,9 @@ import express from 'express';
 
 import is from '@amaui/utils/is';
 import wait from '@amaui/utils/wait';
+import getObjectValue from '@amaui/utils/getObjectValue';
 import setObjectValue from '@amaui/utils/setObjectValue';
-import { TMethod, Query, IMongoResponse, getMongoMatch, IMongoSearchManyAdditional, IMongoSearchOneAdditional, MongoResponse, IClass, } from '@amaui/models';
+import { TMethod, Query, IMongoResponse, getMongoMatch, IMongoSearchManyAdditional as IMongoSearchManyAdditionalInterface, IMongoSearchOneAdditional, MongoResponse, IClass, } from '@amaui/models';
 import { AmauiMongoError, DeveloperError } from '@amaui/errors';
 import AmauiDate from '@amaui/date/AmauiDate';
 import duration from '@amaui/date/duration';
@@ -12,6 +13,26 @@ import AmauiLog from '@amaui/log';
 
 import Mongo from './Mongo';
 import AmauiMongo from './AmauiMongo';
+
+export type IMongoSearchManyAdditionalLookup = {
+  property?: string;
+  query?: any;
+  projection?: any;
+  options?: mongodb.AggregateOptions;
+  objects: BaseCollection<any>;
+  toObjectResponse?: boolean;
+}
+
+export type IMongoSearchManyAdditionalOption = {
+  name: string;
+  property: string;
+  lookup?: IMongoSearchManyAdditionalLookup;
+}
+
+export interface IMongoSearchManyAdditional extends IMongoSearchManyAdditionalInterface {
+  lookups?: IMongoSearchManyAdditionalLookup[];
+  options?: IMongoSearchManyAdditionalOption[];
+}
 
 export interface IUpdateFilters extends mongodb.UpdateFilter<unknown> {
   [p: string]: any;
@@ -390,7 +411,7 @@ export class BaseCollection<IModel = any> {
 
   public async searchMany(
     query: any,
-    additional: IMongoSearchManyAdditional = { pre: [], prePagination: [], post: [] },
+    additional: IMongoSearchManyAdditional = { pre: [], prePagination: [], post: [], options: [], lookups: [] },
     options: ISearchManyOptions = {}
   ): Promise<IMongoResponse> {
     const collection = await this.collection();
@@ -509,6 +530,44 @@ export class BaseCollection<IModel = any> {
       if (last) response['next'] = AmauiMongo.createPaginator(last, [this.sortProperty], sort);
 
       if (first) response['previous'] = AmauiMongo.createPaginator(first, [this.sortProperty], sort, 'previous');
+
+      // lookups
+      await this.lookups(response.response, additional.lookups);
+
+      // options
+      if (!!additional.options?.length) {
+        const optionsResponse = await collection.aggregate(
+          [
+            ...queryMongo,
+
+            ...additional.options.map(item => ({
+              $group: {
+                _id: item.name,
+
+                value: {
+                  $addToSet: item.property.startsWith('$') ? item.property : `$${item.property}`
+                }
+              }
+            }))
+          ],
+          {
+            ...Mongo.defaults.aggregateOptions,
+            ...optionsMongo
+          }
+        ).toArray();
+
+        const optionsMongoResponse = {};
+
+        optionsResponse.forEach(item => optionsMongoResponse[item._id] = item.value?.flatMap(item => item) || []);
+
+        for (const optionName of Object.keys(optionsMongoResponse)) {
+          const optionRequest = additional.options.find(item => item.name === optionName);
+
+          if (optionRequest.lookup) await this.lookups(optionsMongoResponse[optionName], [optionRequest.lookup]);
+        }
+
+        response.options = optionsMongoResponse;
+      }
 
       // Count total only if it's requested by the query
       let total: number;
@@ -989,10 +1048,159 @@ export class BaseCollection<IModel = any> {
     }
   }
 
+  public async lookups(value_: any, lookups: IMongoSearchManyAdditionalLookup[]) {
+    const value = is('array', value_) ? value_ : [value_];
+
+    if (!!value.length && !!lookups?.length) {
+      for (const lookup of lookups) {
+        try {
+          if (lookup.objects) {
+            const ids = [];
+
+            // Get the ids to lookup
+            value.forEach(item => {
+              const valueProperty = !lookup.property ? item : getObjectValue(item, lookup.property);
+
+              ids.push(...this.getLookupIDs(valueProperty));
+            });
+
+            if (!!ids.length) {
+              // Search objects
+              const query = lookup.query || [];
+
+              if (BaseCollection.isAmauiQuery(query)) {
+                if (is('array', (query as Query).query)) {
+                  ((query as Query).query as any[]).unshift(
+                    {
+                      $match: {
+                        _id: { $in: ids }
+                      }
+                    }
+                  );
+
+                  if (lookup.projection) {
+                    ((query as Query).query as any[]).push({
+                      $project: {
+                        ...lookup.projection
+                      }
+                    });
+                  }
+                }
+              }
+              else {
+                (query as any[]).unshift(
+                  {
+                    $match: {
+                      _id: { $in: ids }
+                    }
+                  }
+                );
+
+                if (lookup.projection) {
+                  (query as any[]).push({
+                    $project: {
+                      ...lookup.projection
+                    }
+                  });
+                }
+              }
+
+              const method = lookup.objects.aggregate.bind(lookup.objects);
+
+              let response = await method(query, lookup.options);
+
+              if ([true, undefined].includes(lookup.toObjectResponse)) {
+                response = response.map(item => {
+                  if (item.toObjectResponse) return item.toObjectResponse();
+
+                  return item;
+                });
+              }
+
+              const responseMap = {};
+
+              response.forEach(item => {
+                responseMap[(item._id || item.id).toString()] = item;
+              });
+
+              // Update all the id objects
+              value.forEach((item, index: number) => {
+                const valueItem = this.updateLookupProperty(item, item, responseMap, lookup);
+
+                if (!lookup.property && valueItem) value[index] = valueItem;
+              });
+            }
+          }
+        }
+        catch (error) {
+          console.error(`Lookups error`, error);
+        }
+      }
+    }
+  }
+
+  public updateLookupProperty(mongoObject: any, object: any, responseMap: any, lookup: IMongoSearchManyAdditionalLookup, array = false) {
+    const valueProperty = array ? object : !lookup.property ? object : getObjectValue(object, lookup.property);
+
+    if (is('string', valueProperty)) {
+      const valueResponse = responseMap[valueProperty];
+
+      if (valueResponse !== undefined) {
+        if (lookup.property) setObjectValue(mongoObject, lookup.property, valueResponse);
+        else return valueResponse;
+      }
+    }
+    else if (mongodb.ObjectId.isValid(valueProperty)) {
+      const valueResponse = responseMap[valueProperty?.toString()];
+
+      if (valueResponse !== undefined) {
+        if (lookup.property) setObjectValue(mongoObject, lookup.property, valueResponse);
+        else return valueResponse;
+      }
+    }
+    else if (is('object', valueProperty)) {
+      const id = valueProperty?.id || valueProperty?._id;
+
+      const valueResponse = responseMap[id?.toString()];
+
+      if (valueResponse !== undefined) {
+        if (lookup.property) setObjectValue(mongoObject, lookup.property, valueResponse);
+        else return valueResponse;
+      }
+    }
+    else if (is('array', valueProperty)) {
+      valueProperty.forEach((valuePropertyItem: any, index: number) => {
+        const lookupItem = { ...lookup };
+
+        lookupItem.property = `${lookupItem.property || ''}${lookupItem.property ? '.' : ''}${index}`;
+
+        this.updateLookupProperty(mongoObject, valuePropertyItem, responseMap, lookupItem, true);
+      });
+    }
+  }
+
+  public getLookupIDs(value: any) {
+    const ids = [];
+
+    if (
+      is('string', value) ||
+      mongodb.ObjectId.isValid(value) ||
+      is('array', value) ||
+      is('object', value)
+    ) {
+      if (is('string', value)) ids.push(new mongodb.ObjectId(value));
+      else if (mongodb.ObjectId.isValid(value)) ids.push(value);
+      else if (is('object', value)) ids.push(new mongodb.ObjectId(value?.id || value?._id));
+      else if (is('array', value)) ids.push(...value.flatMap(item => this.getLookupIDs(item)));
+    }
+
+    return ids;
+  }
+
   protected toModel(value: any) {
     if (!this.Model || [null, undefined].includes(value)) return value;
 
-    return is('array', value) ? value.map(item => new this.Model(item)) : new this.Model(value);
+    return is('array', value) ? value.map(item => new this.Model(item, false)) : new this.Model(value, false);
   }
 
   protected response(
