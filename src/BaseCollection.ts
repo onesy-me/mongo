@@ -13,11 +13,13 @@ import AmauiLog from '@amaui/log';
 
 import Mongo from './Mongo';
 import AmauiMongo from './AmauiMongo';
+import { copy } from '@amaui/utils';
 
 export type IMongoSearchManyAdditionalLookup = {
   property?: string;
   query?: any;
   projection?: any;
+  override?: string[];
   options?: mongodb.AggregateOptions;
   objects: BaseCollection<any>;
   toObjectResponse?: boolean;
@@ -1167,6 +1169,14 @@ export class BaseCollection<IModel = any> {
       const id = valueProperty?.id || valueProperty?._id;
 
       const valueResponse = responseMap[id?.toString()];
+
+      const previous = copy(getObjectValue(mongoObject, lookup.property));
+
+      if (lookup.override) {
+        lookup.override.forEach(item => {
+          setObjectValue(valueResponse, item, getObjectValue(previous, item));
+        });
+      }
 
       if (valueResponse !== undefined) {
         if (lookup.property) setObjectValue(mongoObject, lookup.property, valueResponse);
