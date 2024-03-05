@@ -708,7 +708,7 @@ export class BaseCollection<IModel = any> {
 
       if (!value) throw new AmauiMongoError(`No value provided`);
 
-      if (add_date) setObjectValue(value, this.addedProperty || 'added_at', AmauiDate.utc.unix);
+      if (add_date) setObjectValue(value, this.addedProperty || 'added_at', AmauiDate.utc.milliseconds);
 
       const response = await collection.insertOne(value, optionsMongo);
 
@@ -742,7 +742,7 @@ export class BaseCollection<IModel = any> {
 
       if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with update values`);
 
-      if (is('object', value) && update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
+      if (is('object', value) && update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.milliseconds;
 
       const update = {};
       const operators = {};
@@ -839,12 +839,12 @@ export class BaseCollection<IModel = any> {
 
       if (!is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      if (update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
+      if (update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.milliseconds;
 
       let setOnInsert: any;
 
       if (add_date) setOnInsert = {
-        [this.addedProperty || 'added_at']: AmauiDate.utc.unix
+        [this.addedProperty || 'added_at']: AmauiDate.utc.milliseconds
       };
 
       const response = await collection.findOneAndUpdate(
@@ -898,7 +898,7 @@ export class BaseCollection<IModel = any> {
       if (!values?.length) throw new AmauiMongoError(`Values have to be a non empty array`);
 
       if (add_date) values = values.map(item => {
-        setObjectValue(item, this.addedProperty || 'added_at', AmauiDate.utc.unix);
+        setObjectValue(item, this.addedProperty || 'added_at', AmauiDate.utc.milliseconds);
 
         return item;
       });
@@ -948,7 +948,7 @@ export class BaseCollection<IModel = any> {
 
       if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
 
-      if (is('object', value) && update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.unix;
+      if (is('object', value) && update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.milliseconds;
 
       const update = {};
       const operators = {};
