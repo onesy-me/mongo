@@ -1237,7 +1237,7 @@ export class BaseCollection<IModel = any> {
       this.amalog.debug(...arguments_);
     }
 
-    if (this.Model !== undefined) {
+    if (value && this.Model !== undefined) {
       switch (method) {
         case 'find':
         case 'searchMany':
