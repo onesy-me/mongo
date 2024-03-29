@@ -1,6 +1,6 @@
 
-</br >
-</br >
+</br>
+</br>
 
 <p align='center'>
   <a target='_blank' rel='noopener noreferrer' href='#'>
@@ -38,13 +38,13 @@
 ### Add
 
 ```sh
-  yarn add @amaui/mongo
+yarn add @amaui/mongo
 ```
 
 Add `mongodb` as a peer dependency
 
 ```sh
-  yarn add mongodb
+yarn add mongodb
 ```
 
 ### Use
@@ -102,13 +102,13 @@ Add `mongodb` as a peer dependency
 Install
 
 ```sh
-  yarn
+yarn
 ```
 
 Test
 
 ```sh
-  yarn test
+yarn test
 ```
 
 #### One time local setup
@@ -121,7 +121,7 @@ Install docker and docker-compose
 Make docker containers
 
 ```sh
-  yarn docker
+yarn docker
 ```
 
 (mac) Add lines below to */private/etc/hosts*
@@ -139,5 +139,5 @@ Make docker containers
 Build
 
 ```sh
-  yarn build
+yarn build
 ```
