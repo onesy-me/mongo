@@ -6,9 +6,20 @@ import { ConnectionError } from '@amaui/errors';
 import AmauiLog from '@amaui/log';
 import AmauiSubscription from '@amaui/subscription';
 
+export interface IMongoCollectionIndex {
+  name: string;
+
+  indexes: Array<{
+    keys: mongodb.IndexSpecification;
+    options?: mongodb.CreateIndexesOptions;
+  }>;
+}
+
 export interface IMongoOptions {
   name?: string;
   uri?: string;
+
+  indexes?: IMongoCollectionIndex[];
 }
 
 export interface IDefaults {
@@ -45,9 +56,25 @@ export class Mongo {
 
     this.amalog = new AmauiLog({
       arguments: {
-        pre: ['Mongo'],
-      },
+        pre: ['Mongo']
+      }
     });
+  }
+
+  public async createIndexes(): Promise<any> {
+    if (this.options.indexes?.length) {
+      for (const item of this.options.indexes) {
+        const name = item.name;
+
+        if (name && item.indexes?.length) {
+          for (const index of item.indexes) {
+            await this.db.collection(name).createIndex(index.keys, index.options);
+          }
+        }
+      }
+    }
+
+    return true;
   }
 
   public get connection(): Promise<mongodb.Db> | Error {
@@ -55,7 +82,12 @@ export class Mongo {
       if (this.connected) return resolve(this.db);
 
       try {
-        return resolve(await this.connect());
+        const db = await this.connect();
+
+        // Create indexes
+        await this.createIndexes();
+
+        return resolve(db);
       }
       catch (error) {
         throw error;
