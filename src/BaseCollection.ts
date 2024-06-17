@@ -5,7 +5,7 @@ import is from '@amaui/utils/is';
 import wait from '@amaui/utils/wait';
 import getObjectValue from '@amaui/utils/getObjectValue';
 import setObjectValue from '@amaui/utils/setObjectValue';
-import { TMethod, Query, IMongoResponse, getMongoMatch, IMongoSearchManyAdditional as IMongoSearchManyAdditionalInterface, IMongoSearchOneAdditional, MongoResponse, IClass, } from '@amaui/models';
+import { TMethod, Query, IMongoResponse, getMongoMatch, IMongoSearchManyAdditional as IMongoSearchManyAdditionalInterface, IMongoSearchOneAdditional as IMongoSearchOneAdditionalInterface, MongoResponse, IClass, } from '@amaui/models';
 import { AmauiMongoError, DeveloperError } from '@amaui/errors';
 import AmauiDate from '@amaui/date/AmauiDate';
 import duration from '@amaui/date/duration';
@@ -15,7 +15,7 @@ import Mongo from './Mongo';
 import AmauiMongo from './AmauiMongo';
 import { copy } from '@amaui/utils';
 
-export type IMongoSearchManyAdditionalLookup = {
+export type IMongoLookup = {
   property?: string;
   query?: any;
   projection?: any;
@@ -25,16 +25,20 @@ export type IMongoSearchManyAdditionalLookup = {
   toObjectResponse?: boolean;
 }
 
-export type IMongoSearchManyAdditionalOption = {
+export type IMongoOption = {
   name: string;
   property: string;
   version?: 'array' | 'object' | 'string' | 'objectID';
-  lookup?: IMongoSearchManyAdditionalLookup;
+  lookup?: IMongoLookup;
 }
 
 export interface IMongoSearchManyAdditional extends IMongoSearchManyAdditionalInterface {
-  lookups?: IMongoSearchManyAdditionalLookup[];
-  options?: IMongoSearchManyAdditionalOption[];
+  lookups?: IMongoLookup[];
+  options?: IMongoOption[];
+}
+
+export interface IMongoSearchOneAdditional extends IMongoSearchOneAdditionalInterface {
+  lookups?: IMongoLookup[];
 }
 
 export interface IUpdateFilters extends mongodb.UpdateFilter<unknown> {
@@ -47,6 +51,7 @@ export interface IUpdateOrAddOptions extends mongodb.FindOneAndUpdateOptions {
 }
 
 export interface IUpdateOptions extends mongodb.FindOneAndUpdateOptions {
+  lookups?: IMongoLookup[];
   update_date?: boolean;
 }
 
@@ -611,7 +616,7 @@ export class BaseCollection<IModel = any> {
 
   public async searchOne(
     query: any,
-    additional: IMongoSearchOneAdditional = { pre: [], post: [] },
+    additional: IMongoSearchOneAdditional = { pre: [], post: [], lookups: [] },
     options: ISearchOne = {}
   ): Promise<IModel> {
     const collection = await this.collection();
@@ -679,6 +684,9 @@ export class BaseCollection<IModel = any> {
         }
       ).toArray();
 
+      // lookups
+      await this.lookups(response, additional.lookups);
+
       return this.response(start, collection, 'searchOne', response[0]);
     }
     catch (error) {
@@ -724,7 +732,7 @@ export class BaseCollection<IModel = any> {
   public async updateOne(
     query: any,
     value: IUpdateFilters,
-    options_: IUpdateOptions = {}
+    options_: IUpdateOptions = { lookups: [] }
   ): Promise<IModel> {
     const options = { update_date: true, ...options_ };
 
@@ -778,6 +786,9 @@ export class BaseCollection<IModel = any> {
           ...optionsMongo
         } as mongodb.FindOneAndUpdateOptions
       );
+
+      // lookups
+      await this.lookups(response.value, options.lookups);
 
       return this.response(start, collection, 'updateOne', response.value);
     }
@@ -1055,7 +1066,7 @@ export class BaseCollection<IModel = any> {
     }
   }
 
-  public async lookups(value_: any, lookups: IMongoSearchManyAdditionalLookup[]) {
+  public async lookups(value_: any, lookups: IMongoLookup[]) {
     const value = is('array', value_) ? value_ : [value_];
 
     if (!!value.length && !!lookups?.length) {
@@ -1146,7 +1157,7 @@ export class BaseCollection<IModel = any> {
     }
   }
 
-  public updateLookupProperty(mongoObject: any, object: any, responseMap: any, lookup: IMongoSearchManyAdditionalLookup, array = false) {
+  public updateLookupProperty(mongoObject: any, object: any, responseMap: any, lookup: IMongoLookup, array = false) {
     const valueProperty = array ? object : !lookup.property ? object : getObjectValue(object, lookup.property);
 
     if (is('string', valueProperty)) {
