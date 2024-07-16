@@ -48,34 +48,41 @@ export interface IUpdateFilters extends mongodb.UpdateFilter<unknown> {
 export interface IUpdateOrAddOptions extends mongodb.FindOneAndUpdateOptions {
   add_date?: boolean;
   update_date?: boolean;
+  request?: any;
 }
 
 export interface IUpdateOptions extends mongodb.FindOneAndUpdateOptions {
   lookups?: IMongoLookup[];
   update_date?: boolean;
+  request?: any;
 }
 
 export interface IUpdateManyOptions extends mongodb.UpdateOptions {
   update_date?: boolean;
+  request?: any;
 }
 
 export interface IAddOneOptions extends mongodb.InsertOneOptions {
   add_date?: boolean;
+  request?: any;
 }
 
 export interface IAddManyOptions extends mongodb.BulkWriteOptions {
   original?: boolean;
   add_date?: boolean;
+  request?: any;
 }
 
 export interface IFindOptions extends mongodb.FindOptions {
   total?: boolean;
   sort?: any;
   projection?: any;
+  request?: any;
 }
 
 export interface ISearchOne extends mongodb.AggregateOptions {
   projection?: any;
+  request?: any;
 }
 
 export interface ISearchManyOptions extends mongodb.AggregateOptions {
@@ -86,6 +93,19 @@ export interface ISearchManyOptions extends mongodb.AggregateOptions {
   next?: any;
   previous?: any;
   projection?: any;
+  request?: any;
+}
+
+export interface IAggregateOptions extends mongodb.AggregateOptions {
+  request?: any;
+}
+
+export interface IRemoveOneOptions extends mongodb.FindOneAndDeleteOptions {
+  request?: any;
+}
+
+export interface IRemoveManyOptions extends mongodb.DeleteOptions {
+  request?: any;
 }
 
 export type TMethods = 'count' | 'exists' | 'find' | 'findOne' | 'aggregate' | 'searchMany' | 'searchOne' | 'addOne' | 'updateOne' | 'removeOne' | 'updateOneOrAdd' | 'addMany' | 'updateMany' | 'removeMany' | 'bulkWrite';
@@ -387,7 +407,7 @@ export class BaseCollection<IModel = any> {
 
   public async aggregate(
     query: any = new Query(),
-    options: mongodb.AggregateOptions = {}
+    options: IAggregateOptions = {}
   ): Promise<Array<IModel>> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
@@ -540,7 +560,7 @@ export class BaseCollection<IModel = any> {
       if (first) response['previous'] = AmauiMongo.createPaginator(first, [this.sortProperty], sort, 'previous');
 
       // lookups
-      await this.lookups(response.response, additional.lookups);
+      await this.lookups(response.response, additional.lookups, options.request);
 
       // options
       if (!!additional.options?.length) {
@@ -575,7 +595,7 @@ export class BaseCollection<IModel = any> {
         for (const optionName of Object.keys(optionsMongoResponse)) {
           const optionRequest = additional.options.find(item => item.name === optionName);
 
-          if (optionRequest.lookup) await this.lookups(optionsMongoResponse[optionName], [optionRequest.lookup]);
+          if (optionRequest.lookup) await this.lookups(optionsMongoResponse[optionName], [optionRequest.lookup], options.request);
         }
 
         response.options = optionsMongoResponse;
@@ -685,7 +705,7 @@ export class BaseCollection<IModel = any> {
       ).toArray();
 
       // lookups
-      await this.lookups(response, additional.lookups);
+      await this.lookups(response, additional.lookups, options.request);
 
       return this.response(start, collection, 'searchOne', response[0]);
     }
@@ -788,7 +808,7 @@ export class BaseCollection<IModel = any> {
       );
 
       // lookups
-      await this.lookups(response.value, options.lookups);
+      await this.lookups(response.value, options.lookups, options.request);
 
       return this.response(start, collection, 'updateOne', response.value);
     }
@@ -801,7 +821,7 @@ export class BaseCollection<IModel = any> {
 
   public async removeOne(
     query: any,
-    options: mongodb.FindOneAndDeleteOptions = {}
+    options: IRemoveOneOptions = {}
   ): Promise<mongodb.ModifyResult<IModel>> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
@@ -1005,7 +1025,7 @@ export class BaseCollection<IModel = any> {
 
   public async removeMany(
     query: any,
-    options: mongodb.DeleteOptions = {}
+    options: IRemoveManyOptions = {}
   ): Promise<number> {
     const collection = await this.collection();
     const start = AmauiDate.utc.milliseconds;
@@ -1066,7 +1086,7 @@ export class BaseCollection<IModel = any> {
     }
   }
 
-  public async lookups(value_: any, lookups: IMongoLookup[]) {
+  public async lookups(value_: any, lookups: IMongoLookup[], request: any) {
     const value = is('array', value_) ? value_ : [value_];
 
     if (!!value.length && !!lookups?.length) {
@@ -1129,7 +1149,7 @@ export class BaseCollection<IModel = any> {
 
               if ([true, undefined].includes(lookup.toObjectResponse)) {
                 response = response.map(item => {
-                  if (item.toObjectResponse) return item.toObjectResponse();
+                  if (item.toObjectResponse) return item.toObjectResponse(request);
 
                   return item;
                 });
