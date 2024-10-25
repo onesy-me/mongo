@@ -4,6 +4,7 @@ import { merge } from '@amaui/utils';
 import { Query } from '@amaui/models';
 import { ConnectionError } from '@amaui/errors';
 import AmauiLog from '@amaui/log';
+import { IAmauiLogOptions } from '@amaui/log/AmauiLog';
 import AmauiSubscription from '@amaui/subscription';
 
 export interface IMongoCollectionIndex {
@@ -19,6 +20,8 @@ export interface IMongoOptions {
   name?: string;
   uri?: string;
 
+  log_options?: IAmauiLogOptions;
+
   indexes?: IMongoCollectionIndex[];
 }
 
@@ -33,7 +36,7 @@ export class Mongo {
   public db: mongodb.Db;
   public connected = false;
   public client: mongodb.MongoClient;
-  private amalog: AmauiLog;
+  public amauiLog: AmauiLog;
   private options_: IMongoOptions = mongoOptionsDefault;
   public collections: Array<mongodb.CollectionInfo>;
   // For listening on mongo events
@@ -54,10 +57,12 @@ export class Mongo {
   public constructor(options: IMongoOptions = mongoOptionsDefault) {
     this.options = options;
 
-    this.amalog = new AmauiLog({
+    this.amauiLog = new AmauiLog({
       arguments: {
         pre: ['Mongo']
-      }
+      },
+
+      ...options.log_options
     });
   }
 
@@ -100,7 +105,7 @@ export class Mongo {
       if (this.client && this.client.close) {
         await this.client.close();
 
-        this.amalog.important(`Disconnected`);
+        this.amauiLog.important(`Disconnected`);
 
         this.connected = false;
         this.db = undefined;
@@ -137,7 +142,7 @@ export class Mongo {
     if (this.db && name && this.db.databaseName === name) {
       await this.db.dropDatabase();
 
-      this.amalog.important(`Reset`);
+      this.amauiLog.important(`Reset`);
 
       this.subscription.emit('reset');
     }
@@ -153,10 +158,10 @@ export class Mongo {
         this.db = this.client.db(name);
         this.connected = true;
 
-        this.amalog.info(`Connected`);
+        this.amauiLog.info(`Connected`);
 
         this.client.on('close', (event: any) => {
-          this.amalog.warn(`Connection closed`, event);
+          this.amauiLog.warn(`Connection closed`, event);
 
           this.subscription.emit('disconnected');
 
@@ -178,7 +183,7 @@ export class Mongo {
         return resolve(this.db);
       }
       catch (error) {
-        this.amalog.warn(`Connection error`, error);
+        this.amauiLog.warn(`Connection error`, error);
 
         this.subscription.emit('error', error);
 

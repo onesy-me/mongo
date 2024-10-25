@@ -119,7 +119,7 @@ export type TDefaults = {
 export class BaseCollection<IModel = any> {
   private db_: mongodb.Db;
   protected collections: Record<string, mongodb.Collection> = {};
-  protected amalog: AmauiLog;
+  protected amauiLog: AmauiLog;
 
   public static defaults: TDefaults;
 
@@ -132,11 +132,9 @@ export class BaseCollection<IModel = any> {
     if (!(mongo && mongo instanceof Mongo)) throw new AmauiMongoError(`Mongo instance is required`);
     if (!collectionName) throw new AmauiMongoError(`Collection name is required`);
 
-    this.amalog = new AmauiLog({
-      arguments: {
-        pre: ['Mongo']
-      }
-    });
+    // log inherit from Mongo
+    // so it can be configured on per use basis
+    this.amauiLog = mongo.amauiLog;
   }
 
   public get sort(): Record<string, number> {
@@ -185,7 +183,7 @@ export class BaseCollection<IModel = any> {
       Query.collections.push(collection.collectionName);
       Query.keys.allowed.push(collection.collectionName);
 
-      this.amalog.info(`${this.collectionName} collection created`);
+      this.amauiLog.info(`${this.collectionName} collection created`);
     }
 
     return this.collections[name];
@@ -1265,7 +1263,7 @@ export class BaseCollection<IModel = any> {
 
       arguments_.push(`Duration: ${duration(AmauiDate.utc.milliseconds - start, true)}`);
 
-      this.amalog.debug(...arguments_);
+      this.amauiLog.debug(...arguments_);
     }
 
     if (value && this.Model !== undefined) {
