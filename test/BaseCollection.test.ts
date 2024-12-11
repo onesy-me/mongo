@@ -1,11 +1,11 @@
 /* tslint:disable: no-shadowed-variable */
-import { assert } from '@amaui/test';
+import { assert } from '@onesy/test';
 import * as mongodb from 'mongodb';
 
-import * as AmauiUtils from '@amaui/utils';
-import AmauiLog from '@amaui/log';
-import { AmauiDate } from '@amaui/date';
-import { Query } from '@amaui/models';
+import * as OnesyUtils from '@onesy/utils';
+import OnesyLog from '@onesy/log';
+import { OnesyDate } from '@onesy/date';
+import { Query } from '@onesy/models';
 
 import { Mongo, BaseCollection } from '../src';
 
@@ -23,7 +23,7 @@ group('BaseCollection', () => {
   pre(async () => {
     mongo = new Mongo(options);
 
-    AmauiLog.options.log.enabled = false;
+    OnesyLog.options.log.enabled = false;
 
     mongo.subscription.subscribe(message => messages.push(message));
   });
@@ -33,7 +33,7 @@ group('BaseCollection', () => {
   post(async () => {
     await mongo.reset('test');
 
-    AmauiLog.options.log.enabled = true;
+    OnesyLog.options.log.enabled = true;
   });
 
   group('ACollection', () => {
@@ -55,7 +55,7 @@ group('BaseCollection', () => {
       const items = [];
 
       for (const [index, _] of new Array(7).entries()) {
-        await AmauiUtils.wait(40);
+        await OnesyUtils.wait(40);
 
         items.push({
           _id: new mongodb.ObjectId(),
@@ -66,12 +66,12 @@ group('BaseCollection', () => {
             },
           },
           // Milliseconds for purposes of testing only
-          added_at: new AmauiDate().utc.milliseconds
+          added_at: new OnesyDate().utc.milliseconds
         });
       }
 
       for (const [index, _] of new Array(7).entries()) {
-        await AmauiUtils.wait(40);
+        await OnesyUtils.wait(40);
 
         items.push({
           _id: new mongodb.ObjectId(),
@@ -82,7 +82,7 @@ group('BaseCollection', () => {
             },
           },
           // Milliseconds for purposes of testing only
-          added_at: new AmauiDate().utc.milliseconds
+          added_at: new OnesyDate().utc.milliseconds
         });
       }
 
@@ -105,7 +105,7 @@ group('BaseCollection', () => {
     to('collection', async () => {
       const collection = await aCollection.collection();
 
-      assert(collection.dbName).eq('amaui-test');
+      assert(collection.dbName).eq('onesy-test');
       assert(collection.collectionName).eq('a');
     });
 
@@ -485,11 +485,10 @@ group('BaseCollection', () => {
         }),
         {
           'data.a.a': 4,
-        },
-        {
+
           $inc: {
             'a': 4,
-          },
+          }
         }
       );
 

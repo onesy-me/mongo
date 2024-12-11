@@ -1,11 +1,11 @@
 import * as mongodb from 'mongodb';
 
-import { merge } from '@amaui/utils';
-import { Query } from '@amaui/models';
-import { ConnectionError } from '@amaui/errors';
-import AmauiLog from '@amaui/log';
-import { IAmauiLogOptions } from '@amaui/log/AmauiLog';
-import AmauiSubscription from '@amaui/subscription';
+import { merge } from '@onesy/utils';
+import { Query } from '@onesy/models';
+import { ConnectionError } from '@onesy/errors';
+import OnesyLog from '@onesy/log';
+import { IOnesyLogOptions } from '@onesy/log/OnesyLog';
+import OnesySubscription from '@onesy/subscription';
 
 export interface IMongoCollectionIndex {
   name: string;
@@ -20,7 +20,7 @@ export interface IMongoOptions {
   name?: string;
   uri?: string;
 
-  log_options?: IAmauiLogOptions;
+  log_options?: IOnesyLogOptions;
 
   indexes?: IMongoCollectionIndex[];
 }
@@ -36,11 +36,11 @@ export class Mongo {
   public db: mongodb.Db;
   public connected = false;
   public client: mongodb.MongoClient;
-  public amauiLog: AmauiLog;
+  public onesyLog: OnesyLog;
   private options_: IMongoOptions = mongoOptionsDefault;
   public collections: Array<mongodb.CollectionInfo>;
   // For listening on mongo events
-  public subscription = new AmauiSubscription();
+  public subscription = new OnesySubscription();
   public static defaults: IDefaults = {
     aggregateOptions: { allowDiskUse: false },
     limitCount: 1e3
@@ -57,7 +57,7 @@ export class Mongo {
   public constructor(options: IMongoOptions = mongoOptionsDefault) {
     this.options = options;
 
-    this.amauiLog = new AmauiLog({
+    this.onesyLog = new OnesyLog({
       arguments: {
         pre: ['Mongo']
       },
@@ -105,7 +105,7 @@ export class Mongo {
       if (this.client && this.client.close) {
         await this.client.close();
 
-        this.amauiLog.important(`Disconnected`);
+        this.onesyLog.important(`Disconnected`);
 
         this.connected = false;
         this.db = undefined;
@@ -142,7 +142,7 @@ export class Mongo {
     if (this.db && name && this.db.databaseName === name) {
       await this.db.dropDatabase();
 
-      this.amauiLog.important(`Reset`);
+      this.onesyLog.important(`Reset`);
 
       this.subscription.emit('reset');
     }
@@ -158,10 +158,10 @@ export class Mongo {
         this.db = this.client.db(name);
         this.connected = true;
 
-        this.amauiLog.info(`Connected`);
+        this.onesyLog.info(`Connected`);
 
         this.client.on('close', (event: any) => {
-          this.amauiLog.warn(`Connection closed`, event);
+          this.onesyLog.warn(`Connection closed`, event);
 
           this.subscription.emit('disconnected');
 
@@ -183,7 +183,7 @@ export class Mongo {
         return resolve(this.db);
       }
       catch (error) {
-        this.amauiLog.warn(`Connection error`, error);
+        this.onesyLog.warn(`Connection error`, error);
 
         this.subscription.emit('error', error);
 

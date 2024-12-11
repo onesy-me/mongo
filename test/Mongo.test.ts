@@ -1,5 +1,5 @@
 /* tslint:disable: no-shadowed-variable */
-import { assert } from '@amaui/test';
+import { assert } from '@onesy/test';
 
 import { Mongo } from '../src';
 

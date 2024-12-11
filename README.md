@@ -4,11 +4,11 @@
 
 <p align='center'>
   <a target='_blank' rel='noopener noreferrer' href='#'>
-    <img src='utils/images/logo.svg' alt='amaui logo' />
+    <img src='utils/images/logo.svg' alt='onesy logo' />
   </a>
 </p>
 
-<h1 align='center'>amaui Mongo</h1>
+<h1 align='center'>onesy Mongo</h1>
 
 <p align='center'>
   Mongo
@@ -38,7 +38,7 @@
 ### Add
 
 ```sh
-yarn add @amaui/mongo
+yarn add @onesy/mongo
 ```
 
 Add `mongodb` as a peer dependency
@@ -50,7 +50,7 @@ yarn add mongodb
 ### Use
 
 ```javascript
-  import { Mongo, BaseCollection } from '@amaui/mongo';
+  import { Mongo, BaseCollection } from '@onesy/mongo';
   // Make if you wanna a config file and
   // inside of it add all the process.env related props
   import Config from './config';

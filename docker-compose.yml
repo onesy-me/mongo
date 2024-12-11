@@ -8,7 +8,7 @@ services:
     container_name: mongo1
     command: mongod --replSet 'rs0' --bind_ip 0.0.0.0 --port 27017
     volumes:
-      - '~/.amaui/.mongo:/data/db'
+      - '~/.onesy/.mongo:/data/db'
       - './utils/js/mongo/replica-set.js:/utils/js/mongo/replica-set.js'
     ports:
       - '27017:27017'
@@ -35,7 +35,7 @@ services:
     container_name: mongo1-test
     command: mongod --replSet 'rs1' --bind_ip 0.0.0.0 --port 47017
     volumes:
-      - '~/.amaui/.test/.mongo:/data/db'
+      - '~/.onesy/.test/.mongo:/data/db'
       - './utils/js/mongo/replica-set.test.js:/utils/js/mongo/replica-set.test.js'
     ports:
       - '47017:47017'

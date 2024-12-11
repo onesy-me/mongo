@@ -1,12 +1,12 @@
 import * as mongodb from 'mongodb';
 
-import encode from '@amaui/utils/encode';
-import getObjectValue from '@amaui/utils/getObjectValue';
-import { TObject } from '@amaui/models';
+import encode from '@onesy/utils/encode';
+import getObjectValue from '@onesy/utils/getObjectValue';
+import { TObject } from '@onesy/models';
 
 import Mongo from './Mongo';
 
-export class AmauiMongo {
+export class OnesyMongo {
   public static Mongo_ = new Mongo();
 
   public static get mongo() { return this.Mongo_; }
@@ -31,4 +31,4 @@ export class AmauiMongo {
   }
 }
 
-export default AmauiMongo;
+export default OnesyMongo;

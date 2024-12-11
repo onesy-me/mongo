@@ -1,19 +1,19 @@
 import * as mongodb from 'mongodb';
 import express from 'express';
 
-import is from '@amaui/utils/is';
-import copy from '@amaui/utils/copy';
-import wait from '@amaui/utils/wait';
-import getObjectValue from '@amaui/utils/getObjectValue';
-import setObjectValue from '@amaui/utils/setObjectValue';
-import { TMethod, Query, IMongoResponse, getMongoMatch, IMongoSearchManyAdditional as IMongoSearchManyAdditionalInterface, IMongoSearchOneAdditional as IMongoSearchOneAdditionalInterface, MongoResponse, IClass, } from '@amaui/models';
-import { AmauiMongoError, DeveloperError } from '@amaui/errors';
-import AmauiDate from '@amaui/date/AmauiDate';
-import duration from '@amaui/date/duration';
-import AmauiLog from '@amaui/log';
+import is from '@onesy/utils/is';
+import copy from '@onesy/utils/copy';
+import wait from '@onesy/utils/wait';
+import getObjectValue from '@onesy/utils/getObjectValue';
+import setObjectValue from '@onesy/utils/setObjectValue';
+import { TMethod, Query, IMongoResponse, getMongoMatch, IMongoSearchManyAdditional as IMongoSearchManyAdditionalInterface, IMongoSearchOneAdditional as IMongoSearchOneAdditionalInterface, MongoResponse, IClass, } from '@onesy/models';
+import { OnesyMongoError, DeveloperError } from '@onesy/errors';
+import OnesyDate from '@onesy/date/OnesyDate';
+import duration from '@onesy/date/duration';
+import OnesyLog from '@onesy/log';
 
 import Mongo from './Mongo';
-import AmauiMongo from './AmauiMongo';
+import OnesyMongo from './OnesyMongo';
 
 export type IMongoLookup = {
   property?: string;
@@ -119,7 +119,7 @@ export type TDefaults = {
 export class BaseCollection<IModel = any> {
   private db_: mongodb.Db;
   protected collections: Record<string, mongodb.Collection> = {};
-  protected amauiLog: AmauiLog;
+  protected onesyLog: OnesyLog;
 
   public static defaults: TDefaults;
 
@@ -129,12 +129,12 @@ export class BaseCollection<IModel = any> {
     public Model?: IClass,
     public defaults?: TDefaults
   ) {
-    if (!(mongo && mongo instanceof Mongo)) throw new AmauiMongoError(`Mongo instance is required`);
-    if (!collectionName) throw new AmauiMongoError(`Collection name is required`);
+    if (!(mongo && mongo instanceof Mongo)) throw new OnesyMongoError(`Mongo instance is required`);
+    if (!collectionName) throw new OnesyMongoError(`Collection name is required`);
 
     // log inherit from Mongo
     // so it can be configured on per use basis
-    this.amauiLog = mongo.amauiLog;
+    this.onesyLog = mongo.onesyLog;
   }
 
   public get sort(): Record<string, number> {
@@ -183,7 +183,7 @@ export class BaseCollection<IModel = any> {
       Query.collections.push(collection.collectionName);
       Query.keys.allowed.push(collection.collectionName);
 
-      this.amauiLog.info(`${this.collectionName} collection created`);
+      this.onesyLog.info(`${this.collectionName} collection created`);
     }
 
     return this.collections[name];
@@ -246,7 +246,7 @@ export class BaseCollection<IModel = any> {
     options: mongodb.CountDocumentsOptions = {}
   ): Promise<number> {
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const defaults = this.getDefaults('count') as any;
@@ -266,7 +266,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'count');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -275,7 +275,7 @@ export class BaseCollection<IModel = any> {
     options: mongodb.FindOptions = {}
   ): Promise<boolean> {
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const defaults = this.getDefaults('exists') as any;
@@ -299,7 +299,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'exists');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -308,7 +308,7 @@ export class BaseCollection<IModel = any> {
     options: IFindOptions = {}
   ): Promise<IMongoResponse> {
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const {
@@ -325,13 +325,13 @@ export class BaseCollection<IModel = any> {
       const optionsMongo: any = { ...optionsOther };
 
       if (!optionsMongo.projection) {
-        optionsMongo.projection = (BaseCollection.isAmauiQuery(query) && query.projection) || this.projection;
+        optionsMongo.projection = (BaseCollection.isOnesyQuery(query) && query.projection) || this.projection;
 
         if (!optionsMongo.projection) delete optionsMongo.projection;
       }
-      optionsMongo.sort = ((BaseCollection.isAmauiQuery(query) ? query.sort : sort) || this.sort as mongodb.Sort);
-      optionsMongo.skip = (BaseCollection.isAmauiQuery(query) ? query.skip : skip) || 0;
-      optionsMongo.limit = (BaseCollection.isAmauiQuery(query) ? query.limit : limit) || 15;
+      optionsMongo.sort = ((BaseCollection.isOnesyQuery(query) ? query.sort : sort) || this.sort as mongodb.Sort);
+      optionsMongo.skip = (BaseCollection.isOnesyQuery(query) ? query.skip : skip) || 0;
+      optionsMongo.limit = (BaseCollection.isOnesyQuery(query) ? query.limit : limit) || 15;
 
       const queryMongo = {
         // defaults
@@ -352,7 +352,7 @@ export class BaseCollection<IModel = any> {
       response.skip = optionsMongo.skip;
       response.limit = optionsMongo.limit;
 
-      if (BaseCollection.isAmauiQuery(query) ? query.total : total) {
+      if (BaseCollection.isOnesyQuery(query) ? query.total : total) {
         response['total'] = await collection.find(
           queryMongo,
           { projection: { _id: 1 } }
@@ -364,7 +364,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'find');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -373,13 +373,13 @@ export class BaseCollection<IModel = any> {
     options: mongodb.FindOptions = {}
   ): Promise<IModel> {
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const defaults = this.getDefaults('findOne') as any;
 
       if (!options.projection) {
-        options.projection = (BaseCollection.isAmauiQuery(query) && query.projection) || this.projection;
+        options.projection = (BaseCollection.isOnesyQuery(query) && query.projection) || this.projection;
 
         if (!options.projection) delete options.projection;
       }
@@ -399,7 +399,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'findOne');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -408,7 +408,7 @@ export class BaseCollection<IModel = any> {
     options: IAggregateOptions = {}
   ): Promise<Array<IModel>> {
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const defaults = this.getDefaults('aggregate') as any;
@@ -431,7 +431,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'aggregate');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -441,7 +441,7 @@ export class BaseCollection<IModel = any> {
     options: ISearchManyOptions = {}
   ): Promise<IMongoResponse> {
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const {
@@ -458,14 +458,14 @@ export class BaseCollection<IModel = any> {
 
       const optionsMongo = { ...optionsOther };
 
-      const projection = (BaseCollection.isAmauiQuery(query) ? query.projection : optionsProjection) || this.projection;
-      const sort = (BaseCollection.isAmauiQuery(query) ? query.sort : optionsSort) || this.sort as mongodb.Sort;
+      const projection = (BaseCollection.isOnesyQuery(query) ? query.projection : optionsProjection) || this.projection;
+      const sort = (BaseCollection.isOnesyQuery(query) ? query.sort : optionsSort) || this.sort as mongodb.Sort;
       const {
         limit = optionsLimit,
         skip = optionsSkip,
         next,
         previous
-      } = BaseCollection.isAmauiQuery(query) ? query : options;
+      } = BaseCollection.isOnesyQuery(query) ? query : options;
       const hasPaginator = next || previous;
 
       const paginatorProperty = Object.keys((next || previous || {}))[0];
@@ -475,17 +475,17 @@ export class BaseCollection<IModel = any> {
       const post = additional.post || [];
 
       const queries = {
-        search: (BaseCollection.isAmauiQuery(query) ? query.queries.search[this.collectionName] : []) || [],
-        api: (BaseCollection.isAmauiQuery(query) ? query.queries.api[this.collectionName] : []) || [],
-        permissions: (BaseCollection.isAmauiQuery(query) ? query.queries.permissions[this.collectionName] : []) || [],
-        aggregate: (BaseCollection.isAmauiQuery(query) ? query.queries.aggregate[this.collectionName] : []) || []
+        search: (BaseCollection.isOnesyQuery(query) ? query.queries.search[this.collectionName] : []) || [],
+        api: (BaseCollection.isOnesyQuery(query) ? query.queries.api[this.collectionName] : []) || [],
+        permissions: (BaseCollection.isOnesyQuery(query) ? query.queries.permissions[this.collectionName] : []) || [],
+        aggregate: (BaseCollection.isOnesyQuery(query) ? query.queries.aggregate[this.collectionName] : []) || []
       };
 
       const queryMongo = [
         // defaults
         ...(defaults || []),
 
-        ...((BaseCollection.isAmauiQuery(query) ? query.query : query) || []),
+        ...((BaseCollection.isOnesyQuery(query) ? query.query : query) || []),
 
         ...pre,
 
@@ -553,9 +553,9 @@ export class BaseCollection<IModel = any> {
 
       response['hasPrevious'] = !hasPaginator ? query.skip > 0 : next || (response_.length > objects.length);
 
-      if (last) response['next'] = AmauiMongo.createPaginator(last, [this.sortProperty], sort);
+      if (last) response['next'] = OnesyMongo.createPaginator(last, [this.sortProperty], sort);
 
-      if (first) response['previous'] = AmauiMongo.createPaginator(first, [this.sortProperty], sort, 'previous');
+      if (first) response['previous'] = OnesyMongo.createPaginator(first, [this.sortProperty], sort, 'previous');
 
       // lookups
       await this.lookups(response.response, additional.lookups, options.request);
@@ -602,7 +602,7 @@ export class BaseCollection<IModel = any> {
       // Count total only if it's requested by the query
       let total: number;
 
-      if (BaseCollection.isAmauiQuery(query) ? query.total : optionsTotal) {
+      if (BaseCollection.isOnesyQuery(query) ? query.total : optionsTotal) {
         const total_ = await collection.aggregate(
           [
             ...queryMongo,
@@ -628,7 +628,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'searchMany');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -638,7 +638,7 @@ export class BaseCollection<IModel = any> {
     options: ISearchOne = {}
   ): Promise<IModel> {
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const {
@@ -652,23 +652,23 @@ export class BaseCollection<IModel = any> {
       const optionsMongo = { ...optionsOther };
 
       const limit = 1;
-      const projection = (BaseCollection.isAmauiQuery(query) ? query.projection : optionsProjection) || this.projection;
+      const projection = (BaseCollection.isOnesyQuery(query) ? query.projection : optionsProjection) || this.projection;
 
       const pre = additional.pre || [];
       const post = additional.post || [];
 
       const queries = {
-        search: (BaseCollection.isAmauiQuery(query) ? query.queries.search[this.collectionName] : []) || [],
-        api: (BaseCollection.isAmauiQuery(query) ? query.queries.api[this.collectionName] : []) || [],
-        permissions: (BaseCollection.isAmauiQuery(query) ? query.queries.permissions[this.collectionName] : []) || [],
-        aggregate: (BaseCollection.isAmauiQuery(query) ? query.queries.aggregate[this.collectionName] : []) || []
+        search: (BaseCollection.isOnesyQuery(query) ? query.queries.search[this.collectionName] : []) || [],
+        api: (BaseCollection.isOnesyQuery(query) ? query.queries.api[this.collectionName] : []) || [],
+        permissions: (BaseCollection.isOnesyQuery(query) ? query.queries.permissions[this.collectionName] : []) || [],
+        aggregate: (BaseCollection.isOnesyQuery(query) ? query.queries.aggregate[this.collectionName] : []) || []
       };
 
       const queryMongo = [
         // defaults
         ...(defaults || []),
 
-        ...((BaseCollection.isAmauiQuery(query) ? query.query : query) || []),
+        ...((BaseCollection.isOnesyQuery(query) ? query.query : query) || []),
 
         ...pre,
 
@@ -710,7 +710,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'searchOne');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -727,14 +727,14 @@ export class BaseCollection<IModel = any> {
     } = options;
 
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const value = BaseCollection.value(value_);
 
-      if (!value) throw new AmauiMongoError(`No value provided`);
+      if (!value) throw new OnesyMongoError(`No value provided`);
 
-      if (add_date) setObjectValue(value, this.addedProperty || 'added_at', AmauiDate.utc.milliseconds);
+      if (add_date) setObjectValue(value, this.addedProperty || 'added_at', OnesyDate.utc.milliseconds);
 
       const response = await collection.insertOne(value, optionsMongo);
 
@@ -743,7 +743,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'addOne');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -761,14 +761,14 @@ export class BaseCollection<IModel = any> {
     } = options;
 
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const defaults = this.getDefaults('updateOne') as any;
 
-      if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with update values`);
+      if (value !== undefined && !is('object', value)) throw new OnesyMongoError(`Value has to be an object with update values`);
 
-      if (is('object', value) && update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.milliseconds;
+      if (is('object', value) && update_date) value[this.updatedProperty || 'updated_at'] = OnesyDate.utc.milliseconds;
 
       const update = {};
       const operators = {};
@@ -813,7 +813,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'updateOne');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -822,7 +822,7 @@ export class BaseCollection<IModel = any> {
     options: IRemoveOneOptions = {}
   ): Promise<mongodb.ModifyResult<IModel>> {
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const defaults = this.getDefaults('removeOne') as any;
@@ -842,7 +842,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'removeOne');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -861,19 +861,19 @@ export class BaseCollection<IModel = any> {
     } = options;
 
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const defaults = this.getDefaults('updateOneOrAdd') as any;
 
-      if (!is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
+      if (!is('object', value)) throw new OnesyMongoError(`Value has to be an object with properties and values`);
 
-      if (update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.milliseconds;
+      if (update_date) value[this.updatedProperty || 'updated_at'] = OnesyDate.utc.milliseconds;
 
       let setOnInsert: any;
 
       if (add_date) setOnInsert = {
-        [this.addedProperty || 'added_at']: AmauiDate.utc.milliseconds
+        [this.addedProperty || 'added_at']: OnesyDate.utc.milliseconds
       };
 
       const response = await collection.findOneAndUpdate(
@@ -902,7 +902,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'updateOneOrAdd');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -919,15 +919,15 @@ export class BaseCollection<IModel = any> {
     } = options;
 
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       let values = values_.map(item => BaseCollection.value(item));
 
-      if (!values?.length) throw new AmauiMongoError(`Values have to be a non empty array`);
+      if (!values?.length) throw new OnesyMongoError(`Values have to be a non empty array`);
 
       if (add_date) values = values.map(item => {
-        setObjectValue(item, this.addedProperty || 'added_at', AmauiDate.utc.milliseconds);
+        setObjectValue(item, this.addedProperty || 'added_at', OnesyDate.utc.milliseconds);
 
         return item;
       });
@@ -952,7 +952,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'addMany');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -970,14 +970,14 @@ export class BaseCollection<IModel = any> {
     } = options;
 
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const defaults = this.getDefaults('updateMany') as any;
 
-      if (value !== undefined && !is('object', value)) throw new AmauiMongoError(`Value has to be an object with properties and values`);
+      if (value !== undefined && !is('object', value)) throw new OnesyMongoError(`Value has to be an object with properties and values`);
 
-      if (is('object', value) && update_date) value[this.updatedProperty || 'updated_at'] = AmauiDate.utc.milliseconds;
+      if (is('object', value) && update_date) value[this.updatedProperty || 'updated_at'] = OnesyDate.utc.milliseconds;
 
       const update = {};
       const operators = {};
@@ -1017,7 +1017,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'updateMany');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -1026,7 +1026,7 @@ export class BaseCollection<IModel = any> {
     options: IRemoveManyOptions = {}
   ): Promise<number> {
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
       const defaults = this.getDefaults('removeMany') as any;
@@ -1050,7 +1050,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'removeMany');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -1061,10 +1061,10 @@ export class BaseCollection<IModel = any> {
     const options = { ...options_ };
 
     const collection = await this.collection();
-    const start = AmauiDate.utc.milliseconds;
+    const start = OnesyDate.utc.milliseconds;
 
     try {
-      if (!values?.length) throw new AmauiMongoError(`Values have to be a non empty array`);
+      if (!values?.length) throw new OnesyMongoError(`Values have to be a non empty array`);
 
       const response = await collection.bulkWrite(
         values,
@@ -1080,7 +1080,7 @@ export class BaseCollection<IModel = any> {
     catch (error) {
       this.response(start, collection, 'bulkWrite');
 
-      throw new AmauiMongoError(error);
+      throw new OnesyMongoError(error);
     }
   }
 
@@ -1104,7 +1104,7 @@ export class BaseCollection<IModel = any> {
               // Search objects
               const query = lookup.query || [];
 
-              if (BaseCollection.isAmauiQuery(query)) {
+              if (BaseCollection.isOnesyQuery(query)) {
                 if (is('array', (query as Query).query)) {
                   ((query as Query).query as any[]).unshift(
                     {
@@ -1265,9 +1265,9 @@ export class BaseCollection<IModel = any> {
       if (method) arguments_.push(`Method: ${method}`);
       if ((req as any)?.id) arguments_.push(`Request ID: ${(req as any).id}`);
 
-      arguments_.push(`Duration: ${duration(AmauiDate.utc.milliseconds - start, true)}`);
+      arguments_.push(`Duration: ${duration(OnesyDate.utc.milliseconds - start, true)}`);
 
-      this.amauiLog.debug(...arguments_);
+      this.onesyLog.debug(...arguments_);
     }
 
     if (value && this.Model !== undefined) {
@@ -1296,7 +1296,7 @@ export class BaseCollection<IModel = any> {
   }
 
   public query(query: any, aggregate = false) {
-    if (BaseCollection.isAmauiQuery(query)) {
+    if (BaseCollection.isOnesyQuery(query)) {
       if (aggregate) {
         return [
           ...(query?.query || []),
@@ -1372,7 +1372,7 @@ export class BaseCollection<IModel = any> {
     return { ...value };
   }
 
-  public static isAmauiQuery(value: any) {
+  public static isOnesyQuery(value: any) {
     return value instanceof Query || (value?.hasOwnProperty('query') && value?.hasOwnProperty('queries'));
   }
 

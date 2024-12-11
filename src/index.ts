@@ -5,4 +5,4 @@ export * from './Mongo';
 
 export { default as BaseCollection } from './BaseCollection';
 
-export { default as AmauiMongo } from './AmauiMongo';
+export { default as OnesyMongo } from './OnesyMongo';
