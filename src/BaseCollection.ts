@@ -2,6 +2,7 @@ import * as mongodb from 'mongodb';
 import express from 'express';
 
 import is from '@amaui/utils/is';
+import copy from '@amaui/utils/copy';
 import wait from '@amaui/utils/wait';
 import getObjectValue from '@amaui/utils/getObjectValue';
 import setObjectValue from '@amaui/utils/setObjectValue';
@@ -13,7 +14,6 @@ import AmauiLog from '@amaui/log';
 
 import Mongo from './Mongo';
 import AmauiMongo from './AmauiMongo';
-import { copy } from '@amaui/utils';
 
 export type IMongoLookup = {
   property?: string;
@@ -1178,6 +1178,7 @@ export class BaseCollection<IModel = any> {
   public updateLookupProperty(mongoObject: any, object: any, responseMap: any, lookup: IMongoLookup, array = false) {
     const valueProperty = array ? object : !lookup.property ? object : getObjectValue(object, lookup.property);
 
+    // string
     if (is('string', valueProperty)) {
       const valueResponse = responseMap[valueProperty];
 
@@ -1186,6 +1187,7 @@ export class BaseCollection<IModel = any> {
         else return valueResponse;
       }
     }
+    // mongoDB ObjectId
     else if (mongodb.ObjectId.isValid(valueProperty)) {
       const valueResponse = responseMap[valueProperty?.toString()];
 
@@ -1194,6 +1196,7 @@ export class BaseCollection<IModel = any> {
         else return valueResponse;
       }
     }
+    // object
     else if (is('object', valueProperty)) {
       const id = valueProperty?.id || valueProperty?._id;
 
@@ -1212,6 +1215,7 @@ export class BaseCollection<IModel = any> {
         else return valueResponse;
       }
     }
+    // array
     else if (is('array', valueProperty)) {
       valueProperty.forEach((valuePropertyItem: any, index: number) => {
         const lookupItem = { ...lookup };
