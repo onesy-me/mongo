@@ -23,6 +23,9 @@ export interface IMongoOptions {
   log_options?: IOnesyLogOptions;
 
   indexes?: IMongoCollectionIndex[];
+
+  reconnectInterval?: number;
+  maxReconnectAttempts?: number;
 }
 
 export interface IDefaults {
@@ -30,7 +33,10 @@ export interface IDefaults {
   limitCount?: number;
 }
 
-export const mongoOptionsDefault: IMongoOptions = {};
+export const mongoOptionsDefault: IMongoOptions = {
+  reconnectInterval: 5000,
+  maxReconnectAttempts: 10
+};
 
 export class Mongo {
   public db: mongodb.Db;
@@ -41,6 +47,10 @@ export class Mongo {
   public collections: Array<mongodb.CollectionInfo>;
   // For listening on mongo events
   public subscription = new OnesySubscription();
+  public reconnectAttempts = 0;
+  public reconnectTimeout: NodeJS.Timeout;
+  public isExplicitDisconnect = false;
+
   public static defaults: IDefaults = {
     aggregateOptions: { allowDiskUse: false },
     limitCount: 1e3
@@ -101,6 +111,10 @@ export class Mongo {
   }
 
   public get disconnect(): Promise<void> {
+    this.isExplicitDisconnect = true;
+
+    if (this.reconnectTimeout !== undefined) clearTimeout(this.reconnectTimeout);
+
     return new Promise(async resolve => {
       if (this.client && this.client.close) {
         await this.client.close();
@@ -120,19 +134,17 @@ export class Mongo {
     });
   }
 
-  public getCollections(refetch = false): Promise<Array<mongodb.CollectionInfo>> {
-    return new Promise(async resolve => {
-      try {
-        if (this.collections && !refetch) return resolve(this.collections);
+  public async getCollections(refetch = false): Promise<Array<mongodb.CollectionInfo>> {
+    if (this.collections && !refetch) return this.collections;
 
-        this.collections = await this.db.listCollections().toArray();
+    try {
+      this.collections = await this.db.listCollections().toArray();
 
-        return resolve(this.collections);
-      }
-      catch (error) {
-        throw error;
-      }
-    });
+      return this.collections;
+    }
+    catch (error) {
+      throw error;
+    }
   }
 
   // Be very careful with this one,
@@ -148,48 +160,110 @@ export class Mongo {
     }
   }
 
-  private connect(): Promise<mongodb.Db | undefined> {
-    return new Promise(async resolve => {
-      const { uri, name } = this.options;
+  private async connect(): Promise<mongodb.Db | undefined> {
+    const { uri, name } = this.options;
 
-      try {
-        this.client = await mongodb.MongoClient.connect(uri);
+    this.isExplicitDisconnect = false;
+    this.reconnectAttempts = 0;
 
-        this.db = this.client.db(name);
-        this.connected = true;
+    try {
+      const clientOptions: mongodb.MongoClientOptions = {
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        retryWrites: true,
+        retryReads: true,
+        serverSelectionTimeoutMS: 5000
+      };
 
-        this.onesyLog.info(`Connected`);
+      this.client = await mongodb.MongoClient.connect(uri, clientOptions);
 
-        this.client.on('close', (event: any) => {
-          this.onesyLog.warn(`Connection closed`, event);
+      this.db = this.client.db(name);
 
-          this.subscription.emit('disconnected');
+      this.connected = true;
+      this.reconnectAttempts = 0;
 
-          this.connected = false;
+      this.onesyLog.info('Connected to MongoDB');
 
-          setTimeout(() => {
-            if (!this.connected) throw new ConnectionError(`Reconnect failed`);
-          }, 1e4);
-        });
+      // event listeners
+      this.setupConnectionListeners();
 
-        // Get meta about existing collections
-        const collections = await this.getCollections(true);
+      // Get meta about existing collections
+      const collections = await this.getCollections(true);
 
-        // Add collections to Query model
-        Query.collections = collections.map(collection => collection.name);
+      // Add collections to Query model
+      Query.collections = collections.map(collection => collection.name);
 
-        this.subscription.emit('connected');
+      this.subscription.emit('connected');
 
-        return resolve(this.db);
-      }
-      catch (error) {
-        this.onesyLog.warn(`Connection error`, error);
+      return this.db;
+    }
+    catch (error) {
+      this.onesyLog.warn('Initial connection error', error);
 
-        this.subscription.emit('error', error);
+      this.subscription.emit('error', error);
 
-        throw new ConnectionError(error);
-      }
+      throw new ConnectionError(error);
+    }
+  }
+
+  private setupConnectionListeners(): void {
+    if (!this.client) return;
+
+    this.client.on('close', () => {
+      this.onDisconnect();
     });
+
+    this.client.on('error', (err) => {
+      this.onesyLog.warn('MongoDB connection error', err);
+
+      this.onDisconnect();
+    });
+
+    this.client.on('reconnect', () => {
+      this.onesyLog.info('MongoDB reconnected');
+
+      this.connected = true;
+      this.reconnectAttempts = 0;
+
+      this.subscription.emit('reconnected');
+    });
+  }
+
+  private onDisconnect(): void {
+    if (this.isExplicitDisconnect) return;
+
+    this.connected = false;
+
+    this.onesyLog.warn('MongoDB connection lost');
+    this.subscription.emit('disconnected');
+
+    if (this.reconnectAttempts < this.options.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+
+      const delay = this.options.reconnectInterval;
+
+      this.onesyLog.info(`Attempting to reconnect (attempt ${this.reconnectAttempts}/${this.options.maxReconnectAttempts}) in ${delay / 1000} seconds`);
+
+      // clear previous timeout
+      if (this.reconnectTimeout !== undefined) clearTimeout(this.reconnectTimeout);
+
+      this.reconnectTimeout = setTimeout(() => {
+        this.reconnect().catch(error => {
+          this.onesyLog.error('Reconnect attempt failed', error);
+        });
+      }, delay);
+    } else {
+      this.onesyLog.error(`Max reconnection attempts (${this.options.maxReconnectAttempts}) reached. Done.`);
+    }
+  }
+
+  private async reconnect(): Promise<void> {
+    try {
+      await this.connect();
+    }
+    catch (error) {
+      this.onDisconnect();
+    }
   }
 
 }

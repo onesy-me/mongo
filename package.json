@@ -1,6 +1,6 @@
 {
   "name": "@onesy/mongo",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Utils for easier using of mongodb library.",
   "repository": "https://github.com/onesay-me/onesy-mongo.git",
   "author": "Lazar <lazareric2@gmail.com>",
@@ -41,16 +41,15 @@
     "mongodb": "^4.2.2"
   },
   "dependencies": {
+    "@babel/runtime": "^7.18.3",
     "@onesy/date": "^1.0.0",
     "@onesy/errors": "^1.0.0",
     "@onesy/log": "^1.0.0",
     "@onesy/models": "^1.0.0",
     "@onesy/subscription": "^1.0.0",
-    "@onesy/utils": "^1.0.0",
-    "@babel/runtime": "^7.18.3"
+    "@onesy/utils": "^1.0.0"
   },
   "devDependencies": {
-    "@onesy/test": "^1.0.0",
     "@babel/cli": "^7.16.0",
     "@babel/core": "^7.16.0",
     "@babel/plugin-proposal-class-properties": "^7.17.12",
@@ -58,6 +57,7 @@
     "@babel/plugin-transform-runtime": "^7.16.4",
     "@babel/preset-env": "^7.16.4",
     "@babel/preset-typescript": "^7.16.0",
+    "@onesy/test": "^1.0.0",
     "@types/express": "^4.17.13",
     "@types/mongodb": "^4.0.7",
     "@types/node": "^16.11.10",
