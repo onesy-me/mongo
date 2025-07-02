@@ -117,7 +117,6 @@ export type TDefaults = {
 }
 
 export class BaseCollection<IModel = any> {
-  private db_: mongodb.Db;
   protected collections: Record<string, mongodb.Collection> = {};
   protected onesyLog: OnesyLog;
 
@@ -155,9 +154,9 @@ export class BaseCollection<IModel = any> {
 
   public get db(): Promise<mongodb.Db> {
     return new Promise((async resolve => {
-      if (!this.db_) this.db_ = await this.mongo.connection as mongodb.Db;
+      const db = await this.mongo.connection as mongodb.Db;
 
-      return resolve(this.db_);
+      return resolve(db);
     }));
   }
 

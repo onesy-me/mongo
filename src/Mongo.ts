@@ -1,8 +1,7 @@
 import * as mongodb from 'mongodb';
 
-import { merge } from '@onesy/utils';
+import { merge, wait } from '@onesy/utils';
 import { Query } from '@onesy/models';
-import { ConnectionError } from '@onesy/errors';
 import OnesyLog from '@onesy/log';
 import { IOnesyLogOptions } from '@onesy/log/OnesyLog';
 import OnesySubscription from '@onesy/subscription';
@@ -47,9 +46,8 @@ export class Mongo {
   public collections: Array<mongodb.CollectionInfo>;
   // For listening on mongo events
   public subscription = new OnesySubscription();
-  public reconnectAttempts = 0;
-  public reconnectTimeout: NodeJS.Timeout;
-  public isExplicitDisconnect = false;
+  public indexed = false;
+  public retrying = false;
 
   public static defaults: IDefaults = {
     aggregateOptions: { allowDiskUse: false },
@@ -82,9 +80,7 @@ export class Mongo {
         const name = item.name;
 
         if (name && item.indexes?.length) {
-          for (const index of item.indexes) {
-            await this.db.collection(name).createIndex(index.keys, index.options);
-          }
+          for (const index of item.indexes) await this.db.collection(name).createIndex(index.keys, index.options);
         }
       }
     }
@@ -96,38 +92,51 @@ export class Mongo {
     return new Promise(async resolve => {
       if (this.connected) return resolve(this.db);
 
-      try {
-        const db = await this.connect();
+      let db = null;
 
-        // Create indexes
-        await this.createIndexes();
+      this.retrying = true;
 
-        return resolve(db);
-      }
-      catch (error) {
-        throw error;
+      while (!db) {
+        try {
+          db = await this.connect();
+
+          // Create indexes
+          if (!this.indexed) {
+            await this.createIndexes();
+
+            this.indexed = true;
+          }
+
+          this.retrying = false;
+
+          return resolve(db);
+        }
+        catch (error) {
+          this.onesyLog.important('get connection() error', error);
+
+          await wait(1e3);
+        }
       }
     });
   }
 
   public get disconnect(): Promise<void> {
-    this.isExplicitDisconnect = true;
-
-    if (this.reconnectTimeout !== undefined) clearTimeout(this.reconnectTimeout);
+    this.connected = false;
+    this.db = undefined;
+    this.client = undefined;
 
     return new Promise(async resolve => {
-      if (this.client && this.client.close) {
-        await this.client.close();
+      try {
+        if (this.client && this.client.close) {
+          await this.client.close();
 
-        this.onesyLog.important(`Disconnected`);
+          this.onesyLog.important(`Disconnected`);
 
-        this.connected = false;
-        this.db = undefined;
-        this.client = undefined;
-
-        this.subscription.emit('disconnected');
-
-        return resolve();
+          this.subscription.emit('disconnected');
+        }
+      }
+      catch (error) {
+        this.onesyLog.important('get disconnect error', error);
       }
 
       resolve();
@@ -143,6 +152,8 @@ export class Mongo {
       return this.collections;
     }
     catch (error) {
+      this.onesyLog.important('getCollections error', error);
+
       throw error;
     }
   }
@@ -163,13 +174,10 @@ export class Mongo {
   private async connect(): Promise<mongodb.Db | undefined> {
     const { uri, name } = this.options;
 
-    this.isExplicitDisconnect = false;
-    this.reconnectAttempts = 0;
-
     try {
       const clientOptions: mongodb.MongoClientOptions = {
         connectTimeoutMS: 10000,
-        socketTimeoutMS: 45000,
+        socketTimeoutMS: 15000,
         retryWrites: true,
         retryReads: true,
         serverSelectionTimeoutMS: 5000
@@ -180,7 +188,6 @@ export class Mongo {
       this.db = this.client.db(name);
 
       this.connected = true;
-      this.reconnectAttempts = 0;
 
       this.onesyLog.info('Connected to MongoDB');
 
@@ -202,7 +209,7 @@ export class Mongo {
 
       this.subscription.emit('error', error);
 
-      throw new ConnectionError(error);
+      return null;
     }
   }
 
@@ -210,60 +217,22 @@ export class Mongo {
     if (!this.client) return;
 
     this.client.on('close', () => {
-      this.onDisconnect();
+      this.disconnect;
     });
 
-    this.client.on('error', (err) => {
-      this.onesyLog.warn('MongoDB connection error', err);
+    this.client.on('error', error => {
+      this.onesyLog.warn('MongoDB connection error', error);
 
-      this.onDisconnect();
+      if (!this.retrying) this.connection;
     });
 
     this.client.on('reconnect', () => {
       this.onesyLog.info('MongoDB reconnected');
 
       this.connected = true;
-      this.reconnectAttempts = 0;
 
       this.subscription.emit('reconnected');
     });
-  }
-
-  private onDisconnect(): void {
-    if (this.isExplicitDisconnect) return;
-
-    this.connected = false;
-
-    this.onesyLog.warn('MongoDB connection lost');
-    this.subscription.emit('disconnected');
-
-    if (this.reconnectAttempts < this.options.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-
-      const delay = this.options.reconnectInterval;
-
-      this.onesyLog.info(`Attempting to reconnect (attempt ${this.reconnectAttempts}/${this.options.maxReconnectAttempts}) in ${delay / 1000} seconds`);
-
-      // clear previous timeout
-      if (this.reconnectTimeout !== undefined) clearTimeout(this.reconnectTimeout);
-
-      this.reconnectTimeout = setTimeout(() => {
-        this.reconnect().catch(error => {
-          this.onesyLog.error('Reconnect attempt failed', error);
-        });
-      }, delay);
-    } else {
-      this.onesyLog.error(`Max reconnection attempts (${this.options.maxReconnectAttempts}) reached. Done.`);
-    }
-  }
-
-  private async reconnect(): Promise<void> {
-    try {
-      await this.connect();
-    }
-    catch (error) {
-      this.onDisconnect();
-    }
   }
 
 }
