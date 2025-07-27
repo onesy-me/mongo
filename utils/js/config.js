@@ -16,8 +16,8 @@ class Config {
     return {
       db: {
         mongo: {
-          uri: process.env.AMAUI_DB_MONGO_URI || this.default.db.mongo.uri,
-          name: process.env.AMAUI_DB_MONGO_NAME || this.default.db.mongo.name,
+          uri: process.env.ONESY_DB_MONGO_URI || this.default.db.mongo.uri,
+          name: process.env.ONESY_DB_MONGO_NAME || this.default.db.mongo.name,
         },
       },
     };
