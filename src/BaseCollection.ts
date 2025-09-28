@@ -227,6 +227,8 @@ export class BaseCollection<IModel = any> {
       catch (error_) {
         error = error_;
         codeName = error_.codeName || error_.message?.codeName;
+
+        this.onesyLog.error('session error', error.name, (error as any).code, error.message, error.stack);
       }
       finally {
         await session.endSession();
