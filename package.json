@@ -3,7 +3,7 @@
   "version": "1.0.3",
   "description": "Utils for easier using of mongodb library.",
   "repository": "https://github.com/onesay-me/onesy-mongo.git",
-  "author": "Lazar <lazareric2@gmail.com>",
+  "author": "Lazar Erić <lazareric1@proton.me>",
   "license": "MIT",
   "private": false,
   "main": "./src/index.ts",
