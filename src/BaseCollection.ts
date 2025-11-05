@@ -6,7 +6,7 @@ import copy from '@onesy/utils/copy';
 import wait from '@onesy/utils/wait';
 import getObjectValue from '@onesy/utils/getObjectValue';
 import setObjectValue from '@onesy/utils/setObjectValue';
-import { TMethod, Query, IMongoResponse, getMongoMatch, IMongoSearchManyAdditional as IMongoSearchManyAdditionalInterface, IMongoSearchOneAdditional as IMongoSearchOneAdditionalInterface, MongoResponse, IClass, } from '@onesy/models';
+import { TMethod, Query, IMongoResponse, getMongoMatch, IMongoSearchAdditional, MongoResponse, IClass, } from '@onesy/models';
 import { OnesyMongoError, DeveloperError } from '@onesy/errors';
 import OnesyDate from '@onesy/date/OnesyDate';
 import duration from '@onesy/date/duration';
@@ -32,12 +32,12 @@ export type IMongoOption = {
   lookup?: IMongoLookup;
 }
 
-export interface IMongoSearchManyAdditional extends IMongoSearchManyAdditionalInterface {
+export interface IMongoSearchManyAdditional extends IMongoSearchAdditional {
   lookups?: IMongoLookup[];
   options?: IMongoOption[];
 }
 
-export interface IMongoSearchOneAdditional extends IMongoSearchOneAdditionalInterface {
+export interface IMongoSearchOneAdditional extends IMongoSearchAdditional {
   lookups?: IMongoLookup[];
 }
 
@@ -501,7 +501,8 @@ export class BaseCollection<IModel = any> {
         // Permissions
         ...(queries.permissions.length ? getMongoMatch(queries.permissions, '$or') : []),
 
-        ...pre_pagination,
+        // Pre pagination
+        ...pre_pagination
       ];
 
       const pipeline: any[] = [
@@ -635,7 +636,7 @@ export class BaseCollection<IModel = any> {
 
   public async searchOne(
     query: any,
-    additional: IMongoSearchOneAdditional = { pre: [], post: [], lookups: [] },
+    additional: IMongoSearchOneAdditional = { pre: [], prePagination: [], post: [], lookups: [] },
     options: ISearchOne = {}
   ): Promise<IModel> {
     const collection = await this.collection();
@@ -656,6 +657,7 @@ export class BaseCollection<IModel = any> {
       const projection = (BaseCollection.isOnesyQuery(query) ? query.projection : optionsProjection) || this.projection;
 
       const pre = additional.pre || [];
+      const pre_pagination = additional.prePagination || [];
       const post = additional.post || [];
 
       const queries = {
@@ -683,6 +685,9 @@ export class BaseCollection<IModel = any> {
 
         // Permissions
         ...(queries.permissions.length ? getMongoMatch(queries.permissions, '$or') : []),
+
+        // Pre pagination
+        ...pre_pagination
       ];
 
       const pipeline: any[] = [

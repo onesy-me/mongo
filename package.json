@@ -1,6 +1,6 @@
 {
   "name": "@onesy/mongo",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Utils for easier using of mongodb library.",
   "repository": "https://github.com/onesay-me/onesy-mongo.git",
   "author": "Lazar Erić <lazareric1@proton.me>",
@@ -45,7 +45,7 @@
     "@onesy/date": "^1.0.0",
     "@onesy/errors": "^1.0.0",
     "@onesy/log": "^1.0.0",
-    "@onesy/models": "^1.0.0",
+    "@onesy/models": "^1.0.1",
     "@onesy/subscription": "^1.0.0",
     "@onesy/utils": "^1.0.0"
   },
