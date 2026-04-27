@@ -740,7 +740,11 @@ export class BaseCollection<IModel = any> {
 
       if (!value) throw new OnesyMongoError(`No value provided`);
 
-      if (add_date) setObjectValue(value, this.addedProperty || 'added_at', OnesyDate.utc.milliseconds);
+      if (add_date) {
+        const added_at_property = this.addedProperty || 'added_at';
+
+        if (value[added_at_property] === undefined) setObjectValue(value, added_at_property, OnesyDate.utc.milliseconds);
+      }
 
       const response = await collection.insertOne(value, optionsMongo);
 
@@ -932,11 +936,16 @@ export class BaseCollection<IModel = any> {
 
       if (!values?.length) throw new OnesyMongoError(`Values have to be a non empty array`);
 
-      if (add_date) values = values.map(item => {
-        setObjectValue(item, this.addedProperty || 'added_at', OnesyDate.utc.milliseconds);
+      if (add_date) {
+        let added_at_value = OnesyDate.utc.milliseconds;
+        const added_at_property = this.addedProperty || 'added_at';
 
-        return item;
-      });
+        values = values.map(item => {
+          if (item[added_at_property] === undefined) setObjectValue(item, added_at_property, added_at_value++);
+
+          return item;
+        });
+      }
 
       let response = await collection.insertMany(
         values,
