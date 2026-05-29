@@ -563,24 +563,35 @@ export class BaseCollection<IModel = any> {
       await this.lookups(response.response, additional.lookups, options.request);
 
       // options
-      if (!!additional.options?.length) {
-        const optionsResponse = await collection.aggregate(
+      if (response?.response?.length && !!additional.options?.length) {
+        const [result] = await collection.aggregate(
           [
             ...queryMongo,
 
-            ...additional.options.map(item => ['array', undefined].includes(item.version) ? ({
-              $unwind: `$${item.property}`
-            }) : undefined).filter(Boolean),
+            // Use facet to run multiple groupings in parallel
+            // for multiple options, otherwise each $group will be the input as a new document for the next $group and make a bug
+            {
+              $facet: additional.options.reduce((result, item) => {
+                const stages = [];
 
-            ...additional.options.map(item => ({
-              $group: {
-                _id: item.name,
-
-                value: {
-                  $addToSet: item.property.startsWith('$') ? item.property : `$${item.property}`
+                // Only unwind if it's an array
+                if (['array', undefined].includes(item.version)) {
+                  stages.push({ $unwind: `$${item.property}` });
                 }
-              }
-            }))
+
+                // Group to collect unique values
+                stages.push({
+                  $group: {
+                    _id: null,
+                    value: { $addToSet: item.property.startsWith('$') ? item.property : `$${item.property}` }
+                  }
+                });
+
+                result[item.name] = stages;
+
+                return result;
+              }, {})
+            }
           ],
           {
             ...Mongo.defaults.aggregateOptions,
@@ -590,7 +601,9 @@ export class BaseCollection<IModel = any> {
 
         const optionsMongoResponse = {};
 
-        optionsResponse.forEach(item => optionsMongoResponse[item._id] = item.value?.flatMap(item => item) || []);
+        additional.options.forEach(item => {
+          optionsMongoResponse[item.name] = result?.[item.name]?.[0]?.value || [];
+        });
 
         for (const optionName of Object.keys(optionsMongoResponse)) {
           const optionRequest = additional.options.find(item => item.name === optionName);
