@@ -43,7 +43,7 @@ export const mongoOptionsDefault: IMongoOptions = {
   maxReconnectAttempts: 10,
   maxPoolSize: 20,
   minPoolSize: 5,
-  maxIdleTimeMS: 60000,
+  maxIdleTimeMS: 0,
   appName: 'api'
 };
 
@@ -147,6 +147,7 @@ export class Mongo {
       this.reconnectAttempts = 0;
 
       await this.client.close();
+
       this.db = undefined;
       this.client = undefined;
 
@@ -239,7 +240,7 @@ export class Mongo {
       // Get pool size from options with fallbacks
       const maxPoolSize = this.options.maxPoolSize || 20;
       const minPoolSize = this.options.minPoolSize || 5;
-      const maxIdleTimeMS = this.options.maxIdleTimeMS || 6e5;
+      const maxIdleTimeMS = this.options.maxIdleTimeMS ?? 6e5;
       const appName = this.options.appName || 'api';
 
       const clientOptions: mongodb.MongoClientOptions = {
@@ -250,9 +251,9 @@ export class Mongo {
         serverSelectionTimeoutMS: 5000,
 
         // Connection pool configuration
-        maxPoolSize: maxPoolSize,
-        minPoolSize: minPoolSize,
-        maxIdleTimeMS: maxIdleTimeMS,
+        maxPoolSize,
+        minPoolSize,
+        maxIdleTimeMS,
 
         // App identification
         appName: appName,
