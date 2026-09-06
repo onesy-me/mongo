@@ -104,6 +104,8 @@ export class Mongo {
     return new Promise(async resolve => {
       if (this.connected) return resolve(this.db);
 
+      this.onesyLog.debug('🟡 (connection, no cache)', this.connected, this.db);
+
       let db = null;
 
       this.retrying = true;
@@ -111,6 +113,8 @@ export class Mongo {
       while (!db) {
         try {
           db = await this.connect();
+
+          this.onesyLog.debug('🟡 (while (!db))', this.connected, db);
 
           // Create indexes
           if (!this.indexed) {
@@ -136,6 +140,8 @@ export class Mongo {
     if (!this.client) return;
 
     try {
+      this.onesyLog.debug('🟡 (disconnect) connected = false');
+
       this.connected = false;
       this.isReconnecting = false;
       this.reconnectAttempts = 0;
@@ -196,7 +202,10 @@ export class Mongo {
         }
       };
     } catch (error) {
+      this.onesyLog.debug('🟡 (health, error) connected = false');
+
       this.connected = false;
+
       return { connected: false };
     }
   }
@@ -230,7 +239,7 @@ export class Mongo {
       // Get pool size from options with fallbacks
       const maxPoolSize = this.options.maxPoolSize || 20;
       const minPoolSize = this.options.minPoolSize || 5;
-      const maxIdleTimeMS = this.options.maxIdleTimeMS || 60000;
+      const maxIdleTimeMS = this.options.maxIdleTimeMS || 6e5;
       const appName = this.options.appName || 'api';
 
       const clientOptions: mongodb.MongoClientOptions = {
@@ -249,11 +258,15 @@ export class Mongo {
         appName: appName,
 
         // Compression for better performance
-        compressors: ['zstd', 'zlib'],
+        compressors: ['zstd', 'zlib']
       };
 
       this.client = await mongodb.MongoClient.connect(uri, clientOptions);
+
       this.db = this.client.db(name);
+
+      this.onesyLog.debug('✅ (connectWithRetry) connected = true');
+
       this.connected = true;
       this.reconnectAttempts = 0;
       this.isReconnecting = false;
@@ -275,6 +288,9 @@ export class Mongo {
     }
     catch (error) {
       this.onesyLog.warn('Connection error', error);
+
+      this.onesyLog.debug('🟡 (connectWithRetry, error) connected = false');
+
       this.connected = false;
       this.isReconnecting = true;
 
@@ -308,12 +324,17 @@ export class Mongo {
 
     this.client.on('close', () => {
       this.onesyLog.warn('MongoDB connection closed');
+
+      this.onesyLog.debug('🟡 (setupConnectionListeners, close) connected = false');
+
       this.connected = false;
-      // Don't automatically disconnect here to avoid double handling
     });
 
     this.client.on('error', error => {
       this.onesyLog.warn('MongoDB connection error', error);
+
+      this.onesyLog.debug('🟡 (setupConnectionListeners, error) connected = false');
+
       this.connected = false;
 
       // Only attempt reconnect if we're not already reconnecting
@@ -326,9 +347,13 @@ export class Mongo {
 
     this.client.on('reconnect', () => {
       this.onesyLog.info('MongoDB reconnected');
+
+      this.onesyLog.debug('✅ (reconnect) connected = true');
+
       this.connected = true;
       this.isReconnecting = false;
       this.reconnectAttempts = 0;
+
       this.subscription.emit('reconnected');
     });
   }
