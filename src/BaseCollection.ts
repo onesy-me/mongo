@@ -165,11 +165,7 @@ export class BaseCollection<IModel = any> {
     options: mongodb.CreateCollectionOptions = {}
   ): Promise<mongodb.Collection> {
     // Cached collection
-    if (this.collections[name]) {
-      console.log(`Reused collection ${name}`);
-
-      return this.collections[name];
-    }
+    if (this.collections[name]) return this.collections[name];
 
     const db = await this.db;
 

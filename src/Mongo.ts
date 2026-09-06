@@ -41,9 +41,6 @@ export interface IDefaults {
 export const mongoOptionsDefault: IMongoOptions = {
   reconnectInterval: 5000,
   maxReconnectAttempts: 10,
-  maxPoolSize: 20,
-  minPoolSize: 5,
-  maxIdleTimeMS: 6e7,
   appName: 'api'
 };
 
@@ -116,12 +113,8 @@ export class Mongo {
       return this.local.connectionPromise;
     }
 
-    console.log(`(CONNECTION PROMISE) ${process.env.NODE_APP_INSTANCE}`);
-
     this.local.connectionPromise = new Promise(async (resolve, reject) => {
       try {
-        this.onesyLog.debug('🟡 (connection, no cache)', this.connected);
-
         let db = null;
 
         this.retrying = true;
@@ -129,8 +122,6 @@ export class Mongo {
         while (!db) {
           try {
             db = await this.connect();
-
-            this.onesyLog.debug('🟡 (while (!db))', this.connected, db);
 
             // Create indexes
             if (!this.indexed) {
@@ -152,6 +143,7 @@ export class Mongo {
         }
       } catch (error) {
         this.local.connectionPromise = null;
+
         reject(error);
       }
     });
@@ -163,8 +155,6 @@ export class Mongo {
     if (!this.client) return;
 
     try {
-      this.onesyLog.debug('🟡 (disconnect) connected = false');
-
       this.connected = false;
       this.isReconnecting = false;
       this.reconnectAttempts = 0;
@@ -210,30 +200,6 @@ export class Mongo {
     }
   }
 
-  public async health(): Promise<{ connected: boolean; poolStats?: any }> {
-    if (!this.connected || !this.client) {
-      return { connected: false };
-    }
-
-    try {
-      // Ping the database to check connection
-      await this.db.command({ ping: 1 });
-
-      return {
-        connected: true,
-        poolStats: {
-          // You can expose pool stats here if needed
-        }
-      };
-    } catch (error) {
-      this.onesyLog.debug('🟡 (health, error) connected = false');
-
-      this.connected = false;
-
-      return { connected: false };
-    }
-  }
-
   public async connect(): Promise<mongodb.Db | undefined> {
     if (this.connected && this.db) {
       return this.db;
@@ -261,9 +227,9 @@ export class Mongo {
 
     try {
       // Get pool size from options with fallbacks
-      const maxPoolSize = this.options.maxPoolSize ?? 20;
-      const minPoolSize = this.options.minPoolSize ?? 5;
-      const maxIdleTimeMS = this.options.maxIdleTimeMS ?? 6e5;
+      const maxPoolSize = this.options.maxPoolSize;
+      const minPoolSize = this.options.minPoolSize;
+      const maxIdleTimeMS = this.options.maxIdleTimeMS;
       const appName = this.options.appName || 'api';
 
       const clientOptions: mongodb.MongoClientOptions = {
@@ -287,23 +253,13 @@ export class Mongo {
 
       this.client = await mongodb.MongoClient.connect(uri, clientOptions);
 
-      Mongo.mongos[uri] = {};
+      if (!Mongo.mongos[uri]) Mongo.mongos[uri] = {};
 
       this.db = this.client.db(name);
-
-      this.onesyLog.debug('✅ (connectWithRetry) connected = true');
 
       this.connected = true;
       this.reconnectAttempts = 0;
       this.isReconnecting = false;
-
-      console.log('📊📊📊 === CONNECTION ESTABLISHED client ===', this.client);
-
-      console.log('📊📊📊 === CONNECTION ESTABLISHED db ===', this.db);
-
-      this.onesyLog.info(`Connected to MongoDB (pool: ${minPoolSize}-${maxPoolSize}, idle: ${maxIdleTimeMS}ms, app: ${appName})`);
-
-      this.onesyLog.info(`Connected to MongoDB (pool: ${minPoolSize}-${maxPoolSize}, app: ${appName})`);
 
       // Setup event listeners
       this.setupConnectionListeners();
@@ -321,8 +277,6 @@ export class Mongo {
     catch (error) {
       this.onesyLog.warn('Connection error', error);
 
-      this.onesyLog.debug('🟡 (connectWithRetry, error) connected = false');
-
       this.connected = false;
       this.isReconnecting = true;
 
@@ -334,7 +288,7 @@ export class Mongo {
       this.reconnectAttempts++;
 
       if (this.reconnectAttempts <= maxReconnectAttempts) {
-        this.onesyLog.info(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${maxReconnectAttempts})`);
+        this.onesyLog.debug(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${maxReconnectAttempts})`);
 
         await wait(delay);
 
@@ -357,15 +311,11 @@ export class Mongo {
     this.client.on('close', () => {
       this.onesyLog.warn('MongoDB connection closed');
 
-      this.onesyLog.debug('🟡 (setupConnectionListeners, close) connected = false');
-
       this.connected = false;
     });
 
     this.client.on('error', error => {
       this.onesyLog.warn('MongoDB connection error', error);
-
-      this.onesyLog.debug('🟡 (setupConnectionListeners, error) connected = false');
 
       this.connected = false;
 
@@ -380,72 +330,11 @@ export class Mongo {
     this.client.on('reconnect', () => {
       this.onesyLog.info('MongoDB reconnected');
 
-      this.onesyLog.debug('✅ (reconnect) connected = true');
-
       this.connected = true;
       this.isReconnecting = false;
       this.reconnectAttempts = 0;
 
       this.subscription.emit('reconnected');
-    });
-
-    // Debug
-    // === POOL EVENTS ===
-    this.client.on('connectionPoolCreated', (event) => {
-      console.log('🟢 POOL CREATED at:', new Date().toISOString());
-      console.log('  Max Size:', event);
-    });
-
-    this.client.on('connectionPoolReady', (event) => {
-      console.log('✅ POOL READY at:', new Date().toISOString());
-    });
-
-    this.client.on('connectionPoolClosed', (event) => {
-      console.log('🔴🔴🔴 POOL CLOSED at:', new Date().toISOString());
-      console.log('🔴 Stack:', new Error().stack);
-    });
-
-    this.client.on('connectionPoolCleared', (event) => {
-      console.log('🟡🟡🟡 POOL CLEARED at:', new Date().toISOString());
-      console.log('🟡 All connections were removed!');
-      console.log('🟡 Stack:', new Error().stack);
-    });
-
-    // === CONNECTION EVENTS ===
-    this.client.on('connectionCreated', (event) => {
-      console.log('🟢🟢🟢 CONNECTION CREATED at:', new Date().toISOString());
-      console.log('  Connection ID:', event.connectionId);
-    });
-
-    this.client.on('connectionReady', (event) => {
-      console.log('✅ CONNECTION READY at:', new Date().toISOString());
-      console.log('  Connection ID:', event.connectionId);
-    });
-
-    this.client.on('connectionClosed', (event) => {
-      console.log('🔴🔴🔴 CONNECTION CLOSED at:', new Date().toISOString());
-      console.log('  Connection ID:', event.connectionId);
-      console.log('  Reason:', event.reason || 'unknown');
-    });
-
-    // === CHECKOUT EVENTS ===
-    this.client.on('connectionCheckOutStarted', (event) => {
-      console.log('🟣 CHECK OUT STARTED at:', new Date().toISOString());
-    });
-
-    this.client.on('connectionCheckOutFailed', (event) => {
-      console.log('❌ CHECK OUT FAILED at:', new Date().toISOString());
-      console.log('  Reason:', event.reason);
-    });
-
-    this.client.on('connectionCheckedOut', (event) => {
-      // You already have this
-      console.log('🟢 Connection CHECKED OUT at:', new Date().toISOString());
-    });
-
-    this.client.on('connectionCheckedIn', (event) => {
-      // You already have this
-      console.log('🟣 Connection CHECKED IN at:', new Date().toISOString());
     });
   }
 
