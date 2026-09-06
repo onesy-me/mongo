@@ -164,6 +164,9 @@ export class BaseCollection<IModel = any> {
     name: string = this.collectionName,
     options: mongodb.CreateCollectionOptions = {}
   ): Promise<mongodb.Collection> {
+    // Cached collection
+    if (this.collections[name]) return this.collections[name];
+
     const db = await this.db;
 
     if (!this.collections[name]) this.collections[name] = db.collection(name);
