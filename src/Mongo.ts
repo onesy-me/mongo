@@ -42,8 +42,8 @@ export const mongoOptionsDefault: IMongoOptions = {
   reconnectInterval: 5000,
   maxReconnectAttempts: 10,
   maxPoolSize: 20,
-  minPoolSize: 5,
-  maxIdleTimeMS: 0,
+  minPoolSize: 10,
+  maxIdleTimeMS: 6e7,
   appName: 'api'
 };
 
@@ -104,7 +104,7 @@ export class Mongo {
     return new Promise(async resolve => {
       if (this.connected) return resolve(this.db);
 
-      this.onesyLog.debug('🟡 (connection, no cache)', this.connected, this.db);
+      this.onesyLog.debug('🟡 (connection, no cache)', this.connected);
 
       let db = null;
 
@@ -238,8 +238,8 @@ export class Mongo {
 
     try {
       // Get pool size from options with fallbacks
-      const maxPoolSize = this.options.maxPoolSize || 20;
-      const minPoolSize = this.options.minPoolSize || 5;
+      const maxPoolSize = this.options.maxPoolSize ?? 20;
+      const minPoolSize = this.options.minPoolSize ?? 10;
       const maxIdleTimeMS = this.options.maxIdleTimeMS ?? 6e5;
       const appName = this.options.appName || 'api';
 
@@ -254,6 +254,9 @@ export class Mongo {
         maxPoolSize,
         minPoolSize,
         maxIdleTimeMS,
+
+        keepAlive: true,
+        keepAliveInitialDelay: 12e4,
 
         // App identification
         appName: appName,
@@ -271,6 +274,12 @@ export class Mongo {
       this.connected = true;
       this.reconnectAttempts = 0;
       this.isReconnecting = false;
+
+      console.log('📊📊📊 === CONNECTION ESTABLISHED client ===', this.client);
+
+      console.log('📊📊📊 === CONNECTION ESTABLISHED db ===', this.db);
+
+      this.onesyLog.info(`Connected to MongoDB (pool: ${minPoolSize}-${maxPoolSize}, idle: ${maxIdleTimeMS}ms, app: ${appName})`);
 
       this.onesyLog.info(`Connected to MongoDB (pool: ${minPoolSize}-${maxPoolSize}, app: ${appName})`);
 
@@ -356,6 +365,65 @@ export class Mongo {
       this.reconnectAttempts = 0;
 
       this.subscription.emit('reconnected');
+    });
+
+    // Debug
+    // === POOL EVENTS ===
+    this.client.on('connectionPoolCreated', (event) => {
+      console.log('🟢 POOL CREATED at:', new Date().toISOString());
+      console.log('  Max Size:', event);
+    });
+
+    this.client.on('connectionPoolReady', (event) => {
+      console.log('✅ POOL READY at:', new Date().toISOString());
+    });
+
+    this.client.on('connectionPoolClosed', (event) => {
+      console.log('🔴🔴🔴 POOL CLOSED at:', new Date().toISOString());
+      console.log('🔴 Stack:', new Error().stack);
+    });
+
+    this.client.on('connectionPoolCleared', (event) => {
+      console.log('🟡🟡🟡 POOL CLEARED at:', new Date().toISOString());
+      console.log('🟡 All connections were removed!');
+      console.log('🟡 Stack:', new Error().stack);
+    });
+
+    // === CONNECTION EVENTS ===
+    this.client.on('connectionCreated', (event) => {
+      console.log('🟢🟢🟢 CONNECTION CREATED at:', new Date().toISOString());
+      console.log('  Connection ID:', event.connectionId);
+    });
+
+    this.client.on('connectionReady', (event) => {
+      console.log('✅ CONNECTION READY at:', new Date().toISOString());
+      console.log('  Connection ID:', event.connectionId);
+    });
+
+    this.client.on('connectionClosed', (event) => {
+      console.log('🔴🔴🔴 CONNECTION CLOSED at:', new Date().toISOString());
+      console.log('  Connection ID:', event.connectionId);
+      console.log('  Reason:', event.reason || 'unknown');
+    });
+
+    // === CHECKOUT EVENTS ===
+    this.client.on('connectionCheckOutStarted', (event) => {
+      console.log('🟣 CHECK OUT STARTED at:', new Date().toISOString());
+    });
+
+    this.client.on('connectionCheckOutFailed', (event) => {
+      console.log('❌ CHECK OUT FAILED at:', new Date().toISOString());
+      console.log('  Reason:', event.reason);
+    });
+
+    this.client.on('connectionCheckedOut', (event) => {
+      // You already have this
+      console.log('🟢 Connection CHECKED OUT at:', new Date().toISOString());
+    });
+
+    this.client.on('connectionCheckedIn', (event) => {
+      // You already have this
+      console.log('🟣 Connection CHECKED IN at:', new Date().toISOString());
     });
   }
 
