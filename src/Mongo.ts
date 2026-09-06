@@ -42,7 +42,7 @@ export const mongoOptionsDefault: IMongoOptions = {
   reconnectInterval: 5000,
   maxReconnectAttempts: 10,
   maxPoolSize: 20,
-  minPoolSize: 10,
+  minPoolSize: 5,
   maxIdleTimeMS: 6e7,
   appName: 'api'
 };
@@ -60,6 +60,7 @@ export class Mongo {
   public retrying = false;
   public isReconnecting = false;
   public reconnectAttempts = 0;
+  private static mongos = {};
 
   public static defaults: IDefaults = {
     aggregateOptions: { allowDiskUse: false },
@@ -72,6 +73,12 @@ export class Mongo {
 
   public set options(options: IMongoOptions) {
     this.options_ = merge(options, mongoOptionsDefault);
+  }
+
+  public get local() {
+    if (!Mongo.mongos[this.options.uri]) Mongo.mongos[this.options.uri] = {};
+
+    return Mongo.mongos[this.options.uri];
   }
 
   public constructor(options: IMongoOptions = mongoOptionsDefault) {
@@ -101,39 +108,55 @@ export class Mongo {
   }
 
   public get connection(): Promise<mongodb.Db> | Error {
-    return new Promise(async resolve => {
-      if (this.connected) return resolve(this.db);
+    if (this.connected && this.db) {
+      return Promise.resolve(this.db);
+    }
 
-      this.onesyLog.debug('🟡 (connection, no cache)', this.connected);
+    if (this.local.connectionPromise) {
+      return this.local.connectionPromise;
+    }
 
-      let db = null;
+    console.log(`(CONNECTION PROMISE) ${process.env.NODE_APP_INSTANCE}`);
 
-      this.retrying = true;
+    this.local.connectionPromise = new Promise(async (resolve, reject) => {
+      try {
+        this.onesyLog.debug('🟡 (connection, no cache)', this.connected);
 
-      while (!db) {
-        try {
-          db = await this.connect();
+        let db = null;
 
-          this.onesyLog.debug('🟡 (while (!db))', this.connected, db);
+        this.retrying = true;
 
-          // Create indexes
-          if (!this.indexed) {
-            await this.createIndexes();
+        while (!db) {
+          try {
+            db = await this.connect();
 
-            this.indexed = true;
+            this.onesyLog.debug('🟡 (while (!db))', this.connected, db);
+
+            // Create indexes
+            if (!this.indexed) {
+              await this.createIndexes();
+
+              this.indexed = true;
+            }
+
+            this.retrying = false;
+            this.local.connectionPromise = null;
+
+            resolve(db);
           }
+          catch (error) {
+            this.onesyLog.important('get connection() error', error);
 
-          this.retrying = false;
-
-          return resolve(db);
+            await wait(1e3);
+          }
         }
-        catch (error) {
-          this.onesyLog.important('get connection() error', error);
-
-          await wait(1e3);
-        }
+      } catch (error) {
+        this.local.connectionPromise = null;
+        reject(error);
       }
     });
+
+    return this.local.connectionPromise;
   }
 
   public async disconnect(): Promise<void> {
@@ -239,7 +262,7 @@ export class Mongo {
     try {
       // Get pool size from options with fallbacks
       const maxPoolSize = this.options.maxPoolSize ?? 20;
-      const minPoolSize = this.options.minPoolSize ?? 10;
+      const minPoolSize = this.options.minPoolSize ?? 5;
       const maxIdleTimeMS = this.options.maxIdleTimeMS ?? 6e5;
       const appName = this.options.appName || 'api';
 
@@ -255,9 +278,6 @@ export class Mongo {
         minPoolSize,
         maxIdleTimeMS,
 
-        keepAlive: true,
-        keepAliveInitialDelay: 12e4,
-
         // App identification
         appName: appName,
 
@@ -266,6 +286,8 @@ export class Mongo {
       };
 
       this.client = await mongodb.MongoClient.connect(uri, clientOptions);
+
+      Mongo.mongos[uri] = {};
 
       this.db = this.client.db(name);
 
